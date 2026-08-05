@@ -1,6 +1,6 @@
 # Elysian — Master Memory Document
 
-**v1.2 · 27 Jul 2026 · maintained by Lefteris + Claude**
+**v1.3 · 5 Aug 2026 · maintained by Lefteris + Claude**
 
 Purpose: the single source of truth about Elysian for any Claude session. Keep this in the Claude project (suggested path `claude/elysian-memory.md`), alongside the feature docs.
 
@@ -78,20 +78,20 @@ Catalogue: **Software**, **Business Tax**, and **utilities — electricity / int
 ## 3. The Elysian Clearing app
 
 - **Repo**: `lete13/elysian-clearing` (GitHub, **public** — mind what gets committed). **Deploy**: push → Railway auto-redeploys (~60 s) → `elysian-clearing-production.up.railway.app`.
-- **Stack**: `index.html` frontend (**628 KB** as of 27 Jul 2026) + `server.js` (**~89 KB**, Node/Express) + PostgreSQL. Clients poll shared state (`app_data` key `main`) every **60 s**. **Password auth**: `APP_PASSWORD` env + `/api/session`.
+- **Stack**: `index.html` frontend (**747 KB** as of 5 Aug 2026) + `server.js` (**~105 KB**, Node/Express; boot-patched by **`srv-boot.js`**, §7) + PostgreSQL. Clients poll shared state (`app_data` key `main`) every **60 s**. **Password auth**: `APP_PASSWORD` env + `/api/session`.
 
 ### Tab map (from code, 27 Jul 2026)
 
 **Top bar (10):** Dashboard (`dash`) · Bookings (`bk`) · Expenses (`exp`) · Configuration (`cfg`) · Reports (`rpt`) · Annual Tracker (`ann`) · 📋 Monthly Tasks (`mt`) · 💰 Elysian Revenue (`rev`) · 🗓 Daily Ops (`ops`) · 📊 Performance (`perf`)
 **🧰 Tools dropdown (4):** Checkout Tracker (`co`) · Hosthub API (`hhapi`) · Imports incl. Run Tests (`imports`) · 💳 Payments Check (`pay`)
 
-Key behaviours: Reports has **report locking** (`rptLocks`) with the intentional **amber drift banner** when locked figures later change; report delivery is **manual — generate PDF → download → email by hand** (no email machinery in the code; freeform text). Report language per apartment (`language`).
+Key behaviours: Reports has **report locking** (`rptLocks`) with the intentional **amber drift banner** when locked figures later change; report delivery: **📧 Email report to owner** (v12, 4–5 Aug 2026) — real PDF attachment, bilingual compose modal with embedded page-1 preview, sent via `/api/email/send`; sent-record in `S.rptLocks[key].email`; manual PDF download still available (see `claude/email-report-feature.md`). Report language per apartment (`language`).
 
 ### Server API surface (from code)
-`GET/POST /api/db/data` (shared-state pipeline) · `GET /api/db/status` · `POST /api/sync`, `/api/sync-cancelled` · `GET /api/discover`, `/api/history`, `/api/auto-sync-status`, `/api/server-config` · `GET/POST /api/session` (auth) · proofs: `POST/GET/DELETE /api/proofs`, `GET /api/proofs/:id` (table `proof_files`, auto-created) · Viva: `GET /api/viva/status`, `GET /api/viva/probe`, `POST /api/viva/check-now` (90 s cap) · `GET /health` · debug: `POST /api/debug-cancelled`, `/api/debug-checkin`. **Server-side anti-wipe** protects `monthlyTasks` and `payChk`.
+`GET/POST /api/db/data` (shared-state pipeline) · `GET /api/db/status` · `POST /api/sync`, `/api/sync-cancelled` · `GET /api/discover`, `/api/history`, `/api/auto-sync-status`, `/api/server-config` · `GET/POST /api/session` (auth) · proofs: `POST/GET/DELETE /api/proofs`, `GET /api/proofs/:id` (table `proof_files`, auto-created) · Viva: `GET /api/viva/status`, `GET /api/viva/probe`, `POST /api/viva/check-now` (90 s cap) · email: `GET /api/email/status`, `POST /api/email/send`, `GET /api/email/probe` (diagnostics) · fe: `GET /api/fe-info` (auth-exempt release check) · Oxygen diag: `GET /api/oxygen/status`, `GET /api/oxygen/test-issue` (**sandbox-only**, PR #5) · `GET /health` · debug: `POST /api/debug-cancelled`, `/api/debug-checkin`. **Server-side anti-wipe** protects `monthlyTasks` and `payChk`.
 
 ### Railway env (names from code)
-`APP_PASSWORD` · `AUTO_SYNC_HOUR` · `HOSTHUB_API_KEY` · `DATABASE_URL` / `DATABASE_PRIVATE_URL` / `POSTGRES_URL` / `POSTGRES_PRIVATE_URL` / `PG*` family · `PORT` · `VIVA_TX_USER` · `VIVA_TX_PASS` · `VIVA_ENV` · `VIVA_BASE_URL` · `VIVA_ACCOUNTS_URL`. **Postgres backup status: unverified** (Railway navigation was declined in-browser) — open loop: check Railway → Postgres service → Backups; if absent, enable or schedule `pg_dump`.
+`APP_PASSWORD` · `AUTO_SYNC_HOUR` · `HOSTHUB_API_KEY` · `DATABASE_URL` / `DATABASE_PRIVATE_URL` / `POSTGRES_URL` / `POSTGRES_PRIVATE_URL` / `PG*` family · `PORT` · `VIVA_TX_USER` · `VIVA_TX_PASS` · `VIVA_ENV` · `VIVA_BASE_URL` · `VIVA_ACCOUNTS_URL` · email: `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` + `EMAIL_FROM` / `EMAIL_REPLY_TO` / `EMAIL_BCC` (⚠ **Railway firewalls all outbound SMTP below the Pro plan** — plan upgraded to Pro 5 Aug 2026; new network rules apply only to fresh deploys, so redeploy once after any plan change) · Oxygen: `OXYGEN_API_KEY` (sandbox key set 5 Aug) / `OXYGEN_API_BASE` (defaults to sandbox in code) · v11: `USERS_JSON`. **Postgres backup status: unverified** (Railway navigation was declined in-browser) — open loop: check Railway → Postgres service → Backups; if absent, enable or schedule `pg_dump`.
 
 ### Global `S` object (primary data interface in the browser)
 `S.apts` · `S.bks` · `S.revenue.mgmt` / `S.revenue.cleaning` · `S.payChk` (+ `payChk.bank.lastResult`) · `monthlyTasks` / `monthlyTaskDefs` · `rptLocks`.
@@ -157,11 +157,11 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 
 ## 7. Engineering practice & safety rails
 
-- **Change workflow**: Claude edits locally under `/mnt/user-data/outputs/elysian-clearing/`, presents; **Lefteris reviews and pushes**. Claude never pushes to production.
+- **Change workflow**: Claude edits locally under `/mnt/user-data/outputs/elysian-clearing/`, presents; **Lefteris reviews and pushes** — or, for small server/spec releases, **Claude pushes a side branch via the GitHub connector and opens a PR; Lefteris's merge is the approval** (direct `main` writes stay blocked for the connector). Release mechanics: **frontend** via `fe/patches.json` (sha-gated exact-string patches applied at boot; consolidation = full `index.html` web-upload + reset to `{"patches":[]}` — the base-drift gate makes a missed reset harmless; verify via `/api/fe-info`) · **server** via `srv/patches.json` applied at boot by **`srv-boot.js`** (same sha gates, all-or-nothing; local dry-run: `SRVBOOT_DRYRUN=1 node srv-boot.js` → `server.gen.js`). Shipped this way: email probe (PR #3), Resend transport (PR #4, dormant), Oxygen diagnostics (PR #5).
 - **Permission model (set 27 Jul 2026)**: read-only by default; **on Lefteris's explicit request for a specific action** ("tick Birdhouse", "mark TAKK done for X") Claude executes it in the live app via the browser. Claude never *initiates* money-moving changes — expense attribution, tax flags, sign corrections, overrides are proposed with € impact and await explicit confirmation.
 - **Live-app write protocol** (60 s poll can overwrite saves): **pause poll → fetch fresh snapshot → mutate → save → re-fetch to confirm.**
-- **Test suites** (Imports → Run Tests): invariants **P1–P15** (P4 = leased ⇒ businessTax) · months-aware charges **Mm1–Mm4** · Payments Check **Pc1–Pc13** · server `node server.js --viva-selftest` / `--viva-fetch-test`. **Golden locked financials — one per profile (deliberate coverage)**: *Elysian Lycabettus – Horizon* 🏢 · *Cozy Corner Zografou* 🤝 · *Acropolis Skyline Sunset* 🏠.
-- **Claude-in-Chrome playbook**: `select_browser` needs the full device UUID; JS returns truncate ~900–1,000 chars → compact strings/slices, stash arrays on `window.__aptRows`; `reduce` over `S.bks` (never spread into `Math.min/max`); re-establish tab context after bridge drops. Unattended scheduled runs **cannot** drive the browser → no live `S` without Lefteris's session.
+- **Test suites** (Imports → Run Tests): invariants **P1–P15** (P4 = leased ⇒ businessTax) · months-aware charges **Mm1–Mm4** · Payments Check **Pc1–Pc13** · email pagination **Em1–Em5** · server `node server.js --viva-selftest` / `--viva-fetch-test`. **Golden locked financials — one per profile (deliberate coverage)**: *Elysian Lycabettus – Horizon* 🏢 · *Cozy Corner Zografou* 🤝 · *Acropolis Skyline Sunset* 🏠.
+- **Claude-in-Chrome playbook**: `select_browser` needs the full device UUID; JS returns truncate ~900–1,000 chars → compact strings/slices, stash arrays on `window.__aptRows`; `reduce` over `S.bks` (never spread into `Math.min/max`); re-establish tab context after bridge drops. Unattended scheduled runs **cannot** drive the browser → no live `S` without Lefteris's session. Site permissions are per-domain and remembered — a denied prompt (railway.com, docs.oxygen.gr) blocks that domain until re-allowed from the extension.
 - **Excel outputs** with formulas: run `/mnt/skills/public/xlsx/scripts/recalc.py` after saving.
 
 ---
@@ -179,6 +179,13 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 **External / infra:** Viva `biservices:datafileapi` scope (ask account manager) · **Railway Postgres backup status unverified** · P & G Apartment (Lesbos) dormant since 14 Jul — verify in Hosthub before any removal (see §4 matrix).
 
 **Horizon:** calendar-overlap attribution · zero-value direct-booking footnote rows · scheduled remote brief (one-toggle upgrade) · optional server-side daily digest fed by live data.
+
+### 5 Aug 2026 — session additions
+
+- **v11 shipped (4 Aug)** — Property Info tab, per-user account access (`USERS_JSON`), Change Log audit trail. Post-deploy still unverified: `USERS_JSON` accounts set on Railway? `APP_PASSWORD` rotated (it remains a full-access master fallback)?
+- **v12 shipped (4–5 Aug)** — *Email report to owner* live end-to-end after a test send (doc: `claude/email-report-feature.md`). Frontend consolidated: full `index.html` (sha `5cdd8af1…`, 746,739 B) uploaded, `fe/patches.json` reset — patch base for future connector releases.
+- **Railway SMTP saga resolved (5 Aug)** — Railway firewalls **all outbound SMTP below Pro** (probe evidence: even smtp.gmail.com rejected in 255 ms). Fix: **Pro upgrade + one redeploy** (network rules apply per-deployment). Sends via `mail.elysianproperties.eu:465` SSL (host = atlas.cityconsulting.gr, City Consulting cPanel). **PR #4 (Resend HTTPS transport) left open, unmerged — dormant fallback.**
+- **Oxygen Pelatologio integration agreed & keyed (5 Aug)** — full spec in `claude/oxygen-integration-spec.md` (profiles → ΑΠΥ `rs`/ΤΠΥ `s`/skip; `category1_3` + `E3_561_001/003`; 24% VAT; one line per charge honoring the cleaning toggle; owners as Oxygen contacts; email-send also writes Revenue + Annual trackers exactly once). Sandbox `OXYGEN_API_KEY` on Railway; diagnostics staged as **PR #5** (`/api/oxygen/status` + sandbox-only `/api/oxygen/test-issue`); first test issuance pending merge. Full build = a fresh session. Pending inputs: Popi's confirmation of owner contacts in Oxygen + VAT on expense-recharge lines.
 
 ---
 
@@ -264,7 +271,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
@@ -291,6 +298,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **v1.3 (5 Aug 2026)** — session 4–5 Aug applied (5 items approved "all"): v12 email-report shipped + §3 delivery line updated; Railway-blocks-SMTP-below-Pro fact + email/Oxygen env vars (§3); connector branch→PR write path + fe/srv-boot patch release mechanics + Em tests + per-domain Chrome permissions (§7); "5 Aug additions" block in §8 (v11 status, v12, SMTP resolution, Oxygen kickoff); new docs referenced (§11): `claude/email-report-feature.md`, `claude/oxygen-integration-spec.md`. Source: session 4–5 Aug 2026; elysian-clearing PRs #3/#4/#5.
 - **v1.2 (27 Jul 2026)** — canonical home moved to the private `lete13/elysian-brain` repo; §12 write path is now branch → pull request → merge (Lefteris's merge = the approval); project copy refreshed from GitHub after merge. Source: setup session 27 Jul.
 - **v1.1 (27 Jul 2026)** — added §12: weekly memory maintenance loop (proposal → per-item approval → versioned apply; single door, durable-vs-transient, assumptions register, anti-bloat). Source: Lefteris's request, 27 Jul.
 - **v1.0 (27 Jul 2026)** — questionnaire complete (33/33). Folded in: full money-model answers under the Configuration principle; team & accountant (E-New Generation); three-wave close (10th/20th/25th) incl. B2B-partner invoice flow; παρακράτηση reframe; ΙΚΕ + ΑΦΜ rule; live `S.apts` enrichment (profiles/language/BT for all 57, golden-trio coverage, Votsala P4 evidence, b2bPartner + language gaps); code-derived tab map, endpoints, env vars, sizes, manual report delivery; operating decisions (permission model, cloud skills, on-demand brief, EA scope/lane, KPIs, channels); Railway-backup open loop.
