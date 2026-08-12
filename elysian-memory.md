@@ -13,7 +13,7 @@ Purpose: the single source of truth about Elysian for any Claude session. Keep t
 ## 1. Business snapshot
 
 - **Elysian** — short-term rental property management, run by **Lefteris**. Single legal entity: an **ΙΚΕ**, covering all locations including Thessaloniki (ΑΦΜ deliberately excluded from docs).
-- **Team**: Lefteris (owner/manager — reviews proofs, pushes code, makes money decisions) · **Popi** (accounting — monthly checklist, Payments Check) · **George & John** (operations — Daily Ops / Checkout Tracker side).
+- **Team**: Lefteris (owner/manager — reviews proofs, pushes code, makes money decisions) · **Popi** (accounting — monthly checklist, Payments Check) · **George, John & Kostas** (operations — Daily Ops / Checkout Tracker side).
 - **External accountant**: **E-New Generation** — files the monthly VAT return (fully out of Elysian's checklist scope) and receives Elysian's platform invoices monthly (§6).
 - **Portfolio: 57 apartments** — 27 leased 🏢 · 16 B2B 🤝 · 14 private 🏠 (live pull, 27 Jul 2026). Clusters: Athens metro (incl. Piraeus, Cholargos, Zografou, Nea Smyrni, Tavros, Psychiko), **Thessaloniki operation: 8 units** (launched Apr 2026 with 5) — Cornerstone, Hightower, Le Alex, Le Floor, Le Grace, Le Plaza, The Skarlatos residence, plus **ARITI 7 in Halkidiki (a sub-area of the Thessaloniki operation)**. Remaining regional units (Kefalonia, Lesbos, Corinthia, Lavrio, Porto Rafti) are **individual units under the normal model** — no separate segment.
 - **Channels**: Airbnb, Booking.com, and **direct** (including Elysian's own direct websites). No other OTAs — Payments Check's Airbnb+BDC scope is complete. Watch-item: if a direct site ever takes *online* payments, those credits fall outside the Payments Check model.
@@ -263,7 +263,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 - **Permission model**: read-only default; **act on explicit request** (see §7).
 - **Language**: docs/skills/briefs in English; Claude mirrors Greek when addressed in Greek.
 - **EA brief**: **on-demand** for now. KPIs when asked: occupancy, ADR, revenue, payout totals — vs prior month and same month last year (no fixed targets yet).
-- **EA scope**: Elysian ops **and** personal admin when raised. **Ops coordination (cleaners/maintenance, Daily Ops, Checkout Tracker) is out of the EA's lane** — George & John's territory, touched only on explicit ask.
+- **EA scope**: Elysian ops **and** personal admin when raised. **Ops coordination (cleaners/maintenance, Daily Ops, Checkout Tracker) is out of the EA's lane** — George, John & Kostas's territory, touched only on explicit ask.
 - **Drafting channels**: all — email plus WhatsApp/Viber-style short messages, register matched to medium.
 - **Confidentiality**: ΑΦΜ never in docs; everything else acceptable within this private project.
 
@@ -298,6 +298,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **12 Aug 2026** — Kostas added to operations (George, John & Kostas). Source: Lefteris request; app identity list is Operations profile (elysian-clearing).
 - **v1.3 (5 Aug 2026)** — session 4–5 Aug applied (5 items approved "all"): v12 email-report shipped + §3 delivery line updated; Railway-blocks-SMTP-below-Pro fact + email/Oxygen env vars (§3); connector branch→PR write path + fe/srv-boot patch release mechanics + Em tests + per-domain Chrome permissions (§7); "5 Aug additions" block in §8 (v11 status, v12, SMTP resolution, Oxygen kickoff); new docs referenced (§11): `claude/email-report-feature.md`, `claude/oxygen-integration-spec.md`. Source: session 4–5 Aug 2026; elysian-clearing PRs #3/#4/#5.
 - **v1.2 (27 Jul 2026)** — canonical home moved to the private `lete13/elysian-brain` repo; §12 write path is now branch → pull request → merge (Lefteris's merge = the approval); project copy refreshed from GitHub after merge. Source: setup session 27 Jul.
 - **v1.1 (27 Jul 2026)** — added §12: weekly memory maintenance loop (proposal → per-item approval → versioned apply; single door, durable-vs-transient, assumptions register, anti-bloat). Source: Lefteris's request, 27 Jul.
