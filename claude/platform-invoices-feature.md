@@ -43,7 +43,11 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 
 ---
 
-## Manual portal steps (until auto-pull lands)
+## Portal pull (Playwright) + manual fallback
+
+**Preferred:** Tools → Platform Invoices → **Pull from portals**. Clearing runs `scripts/platform-invoice-pull.js` (Playwright/Chromium) with Railway host credentials and stores PDFs in the vault (`source=portal`). First live pass may need selector/MFA tuning.
+
+**Manual fallback** (same dating rules):
 
 ### Airbnb
 1. Hosting → reservations → All  
@@ -76,14 +80,14 @@ When Elysian’s own packs for month X are filed, send one completion notificati
 
 1. Pick the **document month**  
 2. **Hosthub health check** — Airbnb invoices (created that month), Airbnb credit notes (cancelledAt that month), Booking.com bookings (created in previous month)  
-3. Upload PDFs (invoices + credit notes) or portal pull when live  
+3. **Pull from portals** (needs `AIRBNB_HOST_*` / `BOOKING_HOST_*` on Railway) or upload PDFs  
 4. Email packs — default Elysian recipients as above  
 
 ### Hosthub fields
 - `platform` · `created` / `createdOnChannel` · `cancelled` / `cancelledAt`
 
 ### Env
-`PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `AIRBNB_HOST_*` · `BOOKING_HOST_*` — see clearing `scripts/platform-invoice-pull.md`.
+`PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `AIRBNB_HOST_EMAIL` / `AIRBNB_HOST_PASSWORD` · `BOOKING_HOST_EMAIL` / `BOOKING_HOST_PASSWORD` — see clearing `scripts/platform-invoice-pull.md`.
 
 ---
 
