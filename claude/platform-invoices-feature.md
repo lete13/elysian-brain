@@ -76,12 +76,17 @@ When Elysian’s own packs for month X are filed, send one completion notificati
 
 ---
 
-## App — Tools → Platform Invoices
+## App — Platform Invoices (accounting tab)
 
-1. Pick the **document month**  
-2. **Hosthub health check** — Airbnb invoices (created that month), Airbnb credit notes (cancelledAt that month), Booking.com bookings (created in previous month)  
-3. **Pull from portals** (needs `AIRBNB_HOST_*` / `BOOKING_HOST_*` on Railway) or upload PDFs  
-4. Email packs — default Elysian recipients as above  
+Primary nav tab for Accounting (also Admin). Guided pipeline in one place:
+
+1. **Start** — pick document month  
+2. **Expect** — Hosthub health check (Airbnb created / cancelledAt, Booking.com M−1)  
+3. **Collect** — multi-upload PDFs (recommended) or try portal pull if sessions are set  
+4. **Review** — vault vs expect  
+5. **Ship** — email finished Elysian pack to accountants (`info@e-newgeneration.gr`, `info@elysianproperties.eu`)  
+
+Portal auto-pull still needs `*_STORAGE_STATE_B64` when captcha/OTP blocks Railway; upload inside the pipeline is the reliable collect path.  
 
 ### Hosthub fields
 - `platform` · `created` / `createdOnChannel` · `cancelled` / `cancelledAt`
