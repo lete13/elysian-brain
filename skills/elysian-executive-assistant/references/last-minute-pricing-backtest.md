@@ -12,16 +12,24 @@ Performance tab now backtests Hosthub bookings using each reservation's **`creat
 
 Also: Attiki / Thessaloniki vacancy alerts now check **3 and 7 days** (worst wins) so soft 7-day holes flag earlier.
 
-### Offline / CLI
-```bash
-# From a bookings export ({ bookings, apartments } or bare array):
-npm run backtest:lm -- --file bookings.json
+### How to run against live Hosthub
 
-# Live Hosthub (needs HOSTHUB_API_KEY):
-HOSTHUB_API_KEY=… npm run backtest:lm -- --hosthub --json > lm-report.json
+**Why `--hosthub` failed in the cloud agent:** only an invalid `RAILWAY_TOKEN` was injected — no `HOSTHUB_API_KEY` / `DATABASE_URL` / `APP_PASSWORD`. Hosthub then returns 401. See `pricelabs-hosthub-backtest.md`.
+
+```bash
+# Preferred after deploy — uses Postgres bookings already synced from Hosthub:
+APP_PASSWORD='…' npm run backtest:lm -- --api https://elysian-clearing-production.up.railway.app
+APP_PASSWORD='…' npm run backtest:lm -- --api https://… --refresh   # force Hosthub re-pull
+
+# Direct Hosthub (raw API key, same auth as server.js):
+HOSTHUB_API_KEY='…' npm run backtest:lm -- --hosthub
+
+# Or Postgres:
+DATABASE_URL='…' npm run backtest:lm -- --db
 ```
 
-Engine: `lib/last-minute-backtest.js` · tests: `tests/last-minute-backtest.test.js`.
+Server endpoint: `GET /api/backtest/last-minute` (`?refresh=1` / `?source=hosthub` / `?lookback=90`).
+
 
 ## How to act in PriceLabs
 When Performance shows **Cut to €X** / **LAST-MINUTE CUT**:
