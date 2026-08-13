@@ -23,6 +23,10 @@ GitHub web UI (replacing `index.html` or `server.js`) and reset the patch file t
 
 ## Oxygen invoicing (live, production)
 
+> **Not platform invoices.** Oxygen issues Elysian's ΑΠΥ/ΤΠΥ to owners/partners.
+> Airbnb/Booking.com **host-portal** PDFs (ενδοκοινοτικά → accountants/partners) are a
+> separate flow — Tools → Platform Invoices; see `claude/platform-invoices-feature.md`.
+
 Endpoints on the server: `POST /api/oxygen/issue`, `/issue-preview` (dry run),
 `GET /api/oxygen/documents` (ledger), `/status`, `/lookups`, `/invoice-pdf/:id`.
 
