@@ -302,6 +302,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **13 Aug 2026** — Platform invoices: **pull-first automation** (DB portal sessions, multi-property Booking pull, upload emergency-only). Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices: Booking.com = **one invoice per apartment** (Expect/Collect checklist + apartment tagging); 0-PDF portal pull shown as failure. Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices SOP: ASAP; Booking.com month-after; Airbnb VAT invoice = Hosthub `created`; Airbnb **credit note** = `cancelledAt` (download both across months if needed); Elysian-own → E-New Generation + info@; no personal names. Tools → Platform Invoices + Hosthub health check + **Playwright portal pull** (`AIRBNB_HOST_*` / `BOOKING_HOST_*`). Doc: `claude/platform-invoices-feature.md`.
 - **v1.3 (5 Aug 2026)** — session 4–5 Aug applied (5 items approved "all"): v12 email-report shipped + §3 delivery line updated; Railway-blocks-SMTP-below-Pro fact + email/Oxygen env vars (§3); connector branch→PR write path + fe/srv-boot patch release mechanics + Em tests + per-domain Chrome permissions (§7); "5 Aug additions" block in §8 (v11 status, v12, SMTP resolution, Oxygen kickoff); new docs referenced (§11): `claude/email-report-feature.md`, `claude/oxygen-integration-spec.md`. Source: session 4–5 Aug 2026; elysian-clearing PRs #3/#4/#5.

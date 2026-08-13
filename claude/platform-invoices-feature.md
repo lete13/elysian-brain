@@ -43,11 +43,15 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 
 ---
 
-## Portal pull (Playwright) + manual fallback
+## Automated pull (no monthly PDF upload)
 
-**Preferred:** Tools → Platform Invoices → **Pull from portals**. Clearing runs `scripts/platform-invoice-pull.js` (Playwright/Chromium) with Railway host credentials and stores PDFs in the vault (`source=portal`). **Booking.com always goes through https://admin.booking.com/** (partner extranet), not www.booking.com. First live pass may need selector/MFA tuning.
+**Normal path:** Platform Invoices → Collect → **Pull from portals**. Clearing runs `scripts/platform-invoice-pull.js` (Playwright/Chromium), walks **every Booking.com property** (one invoice each), tags apartments, and stores PDFs (`source=portal`). **Booking.com always via https://admin.booking.com/**.
 
-**Manual fallback** (same dating rules):
+**One-time Connect** (only when captcha/OTP blocks password login): run `platform-invoice-save-session.js --headed` on a laptop, then **Connect Airbnb/Booking** in the app (sessions stored in DB and refreshed after successful pulls). This is *not* uploading invoice PDFs.
+
+**Emergency only:** manual PDF upload under Collect → “Emergency manual tools”.
+
+**Manual portal steps** (same dating rules) if automation is offline:
 
 ### Airbnb
 1. Hosting → reservations → All  
@@ -82,11 +86,11 @@ Primary nav tab for Accounting (also Admin). Guided pipeline in one place:
 
 1. **Start** — pick document month  
 2. **Expect** — Hosthub health check (Airbnb created / cancelledAt; Booking.com **apartments** for M−1)  
-3. **Collect** — apartment checklist; upload PDFs tagged to apartment (recommended) or try portal pull; retag vault rows if needed  
+3. **Collect** — apartment checklist; **Pull from portals** (auto); Connect sessions once if needed; upload is emergency-only  
 4. **Review** — vault vs expect (gates warn if Booking apartments missing)  
 5. **Ship** — email finished Elysian pack to accountants (`info@e-newgeneration.gr`, `info@elysianproperties.eu`); warns again if apartments incomplete  
 
-Portal auto-pull still needs `*_STORAGE_STATE_B64` when captcha/OTP blocks Railway. A **0 PDF** pull is treated as failure and shows portal error text — use Upload and tag each Booking PDF to its apartment.  
+A **0 PDF** pull is a failure with portal error text — **Connect** the blocked session and Pull again (do not treat monthly PDF upload as the process).  
 
 ### Hosthub fields
 - `platform` · `created` / `createdOnChannel` · `cancelled` / `cancelledAt` · `aptId` / `aptName`
