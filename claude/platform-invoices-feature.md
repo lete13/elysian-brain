@@ -25,9 +25,9 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 ## How each channel dates documents (critical)
 
 ### Booking.com
-- Summarises **all reservations of a calendar month** and cuts **one invoice the month after**.
-- Example: all **June** bookings → invoice issued in **July**.
-- Hosthub health-check for invoice month **M** counts Booking.com bookings **created in M−1**.
+- Summarises reservations and cuts **one invoice per apartment** the **month after** the stays.
+- Example: all **June** bookings for apartment X → **one** July invoice for apartment X (not one PDF per booking).
+- Hosthub expect for document month **M** lists **unique apartments** with Booking.com bookings **created in M−1** (active). Booking count is shown only as context.
 
 ### Airbnb — VAT invoice
 - Airbnb generates the VAT invoice when the booking is **confirmed**.
@@ -81,15 +81,15 @@ When Elysian’s own packs for month X are filed, send one completion notificati
 Primary nav tab for Accounting (also Admin). Guided pipeline in one place:
 
 1. **Start** — pick document month  
-2. **Expect** — Hosthub health check (Airbnb created / cancelledAt, Booking.com M−1)  
-3. **Collect** — multi-upload PDFs (recommended) or try portal pull if sessions are set  
-4. **Review** — vault vs expect  
-5. **Ship** — email finished Elysian pack to accountants (`info@e-newgeneration.gr`, `info@elysianproperties.eu`)  
+2. **Expect** — Hosthub health check (Airbnb created / cancelledAt; Booking.com **apartments** for M−1)  
+3. **Collect** — apartment checklist; upload PDFs tagged to apartment (recommended) or try portal pull; retag vault rows if needed  
+4. **Review** — vault vs expect (gates warn if Booking apartments missing)  
+5. **Ship** — email finished Elysian pack to accountants (`info@e-newgeneration.gr`, `info@elysianproperties.eu`); warns again if apartments incomplete  
 
-Portal auto-pull still needs `*_STORAGE_STATE_B64` when captcha/OTP blocks Railway; upload inside the pipeline is the reliable collect path.  
+Portal auto-pull still needs `*_STORAGE_STATE_B64` when captcha/OTP blocks Railway. A **0 PDF** pull is treated as failure and shows portal error text — use Upload and tag each Booking PDF to its apartment.  
 
 ### Hosthub fields
-- `platform` · `created` / `createdOnChannel` · `cancelled` / `cancelledAt`
+- `platform` · `created` / `createdOnChannel` · `cancelled` / `cancelledAt` · `aptId` / `aptName`
 
 ### Env
 `PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `AIRBNB_HOST_EMAIL` / `AIRBNB_HOST_PASSWORD` · `BOOKING_HOST_EMAIL` / `BOOKING_HOST_PASSWORD` — see clearing `scripts/platform-invoice-pull.md`.
