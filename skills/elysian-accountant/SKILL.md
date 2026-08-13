@@ -68,11 +68,11 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 
 1. **TAKK Issuance** (private apartments) — issue the ειδικό στοιχείο per stay; upload proof per apartment line.
 2. **TAKK Payment** (private apartments) — pay what was issued; proof per line. (Statutory δήλωση deadline is month-end — internal 20th is the buffer; filer confirmation pending.)
-3. **Platform invoices, leased units** — download the month's **Airbnb + Booking.com host-portal** invoice PDFs for Elysian-leased apartments and send the pack to **E-New Generation**. These are **ενδοκοινοτικά** documents from the platforms (not Oxygen, not Greek expense import). App: Tools → **Platform Invoices** (upload/email now; portal pull next). See `claude/platform-invoices-feature.md`.
+3. **Platform invoices, leased units** — download the month's **Airbnb + Booking.com host-portal** invoice PDFs for Elysian-leased apartments and send the pack to **E-New Generation**. These are **ενδοκοινοτικά** documents from the platforms (not Oxygen, not Greek expense import). **Do this early** once the previous month's portal invoices are available — the 20th is only the latest safe date. App: Tools → **Platform Invoices**. See `claude/platform-invoices-feature.md`.
 
 ### Wave 3 — by the 25th: B2B platform invoices
 
-1. **Platform invoices, B2B units** — same portal PDFs for the 16 B2B apartments; email each pack to its **B2B partner** (cross-European declarations). Same Platform Invoices tab, scope **b2b**.
+1. **Platform invoices, B2B units** — same portal PDFs for the 16 B2B apartments; email each pack to its **B2B partner** (cross-European declarations). Same Platform Invoices tab, scope **b2b**. Prefer sending as soon as ready; **25th is the backstop**.
 2. **Blocker**: `b2bPartner` is empty on **all 16 B2B units** — partner routing stays manual until Configuration is filled.
 3. **Private owners receive no platform invoices.** Ever.
 4. **Do not confuse with Oxygen:** Monthly Close Email issues ΑΠΥ/ΤΠΥ *to owners/partners for management charges*. Platform invoices are a separate handoff.

@@ -14,11 +14,13 @@
 
 ## Monthly process
 
-| Wave | Deadline | Scope | Recipient |
-|---|---|---|---|
-| 2 | **20th** | **Leased** apartments (Elysian is host) | **E-New Generation** |
-| 3 | **25th** | **B2B** apartments | Each **B2B partner** (cross-European declarations) |
-| — | — | Private | **None** — private owners never receive platform invoices |
+These are **previous-month** invoices. As soon as a calendar month ends, the host-portal PDFs for that month can be pulled and sent — **do not wait for the 20th/25th**. Those dates are only the **latest** safe handoff points in the close calendar, not the preferred start.
+
+| Wave | Latest by | Scope | Recipient | Preferred timing |
+|---|---|---|---|---|
+| 2 | **20th** | **Leased** (Elysian is host) | **E-New Generation** | **Early in the month** once July/previous-month portal invoices are available |
+| 3 | **25th** | **B2B** | Each **B2B partner** | Same — as soon as ready; 25th is the backstop |
+| — | — | Private | **None** | — |
 
 ## App (elysian-clearing)
 
