@@ -45,7 +45,7 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 
 ## Portal pull (Playwright) + manual fallback
 
-**Preferred:** Tools → Platform Invoices → **Pull from portals**. Clearing runs `scripts/platform-invoice-pull.js` (Playwright/Chromium) with Railway host credentials and stores PDFs in the vault (`source=portal`). First live pass may need selector/MFA tuning.
+**Preferred:** Tools → Platform Invoices → **Pull from portals**. Clearing runs `scripts/platform-invoice-pull.js` (Playwright/Chromium) with Railway host credentials and stores PDFs in the vault (`source=portal`). **Booking.com always goes through https://admin.booking.com/** (partner extranet), not www.booking.com. First live pass may need selector/MFA tuning.
 
 **Manual fallback** (same dating rules):
 
