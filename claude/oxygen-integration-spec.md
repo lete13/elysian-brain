@@ -2,6 +2,8 @@
 
 Goal: issuing the owner's legal document (and closing the month's trackers) becomes part of the report-email flow in the Elysian Clearing app. Agreed with Lefteris 5 Aug 2026; accountant mapping from Popi's screenshot same day. **Build pending — sandbox stage.**
 
+> Out of scope here: **Airbnb / Booking.com platform invoices** (PDFs from the host portals, ενδοκοινοτικά, forwarded to E-New Generation / B2B partners). Those are not Oxygen documents — see `claude/platform-invoices-feature.md`.
+
 ## Platform & API
 - **Oxygen Pelatologio** (pelatologio.gr) — Greek cloud invoicing with myDATA transmission. API: OpenAPI 3.1 spec at **docs.oxygen.gr** (Swagger UI, spec file `oxygen-api.json`).
 - **Sandbox** `https://sandbox-api.oxygen.gr/v1` · **Production** `https://api.oxygen.gr/v1` · Bearer token (`Authorization: Bearer <key>` + `Accept: application/json`). Keys from Oxygen support (ERP Pro+ package; Hosthub-partner offer exists).

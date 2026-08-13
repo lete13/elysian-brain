@@ -68,13 +68,14 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 
 1. **TAKK Issuance** (private apartments) — issue the ειδικό στοιχείο per stay; upload proof per apartment line.
 2. **TAKK Payment** (private apartments) — pay what was issued; proof per line. (Statutory δήλωση deadline is month-end — internal 20th is the buffer; filer confirmation pending.)
-3. **Platform invoices, leased units** — collect the month's Airbnb + Booking.com invoices for Elysian-leased apartments and send them to **E-New Generation**; proof on the invoice line.
+3. **Platform invoices, leased / Elysian-tax units** — download Airbnb + Booking.com host-portal PDFs **ASAP** after they exist. Dating: Booking.com = month after bookings; Airbnb VAT invoice = Hosthub **`created`**; Airbnb **credit note** on cancel = Hosthub **`cancelledAt`** (file both months when they differ). Health-check in Tools → Platform Invoices. Elysian-own → `info@e-newgeneration.gr` + `info@elysianproperties.eu`. See `claude/platform-invoices-feature.md`.
 
-### Wave 3 — by the 25th: B2B platform invoices
+### Wave 3 — B2B / external groups (platform invoices)
 
-1. **Platform invoices, B2B units** — collect the month's Airbnb + Booking.com invoices for the 16 B2B apartments and send each batch to its **B2B partner** (they need them for cross-European declarations); proof on the line.
-2. **Blocker**: `b2bPartner` is empty on **all 16 B2B units** — this wave can't be routed until that data gap is filled.
+1. **Platform invoices for non-Elysian groups** — same portal rules (including Airbnb credit notes); email each group’s accountant/owner pack ASAP.
+2. **Blocker**: group recipient mapping still incomplete in Configuration for some units.
 3. **Private owners receive no platform invoices.** Ever.
+4. **Do not confuse with Oxygen** ΑΠΥ/ΤΠΥ for management charges.
 
 ### Close-out
 

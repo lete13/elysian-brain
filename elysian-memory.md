@@ -145,11 +145,15 @@ Auto-reconciliation Saturday 08:00 Europe/Athens + "✓ Check now". Blocked on O
 |---|---|---|---|---|
 | 1 | **10th** | Monthly Clearing Report | All apartments | Owner/partner per apartment (PDF, manual email) |
 | 2 | **20th** | TAKK Issuance + TAKK Payment | Private | Elysian issues **and** pays |
-| 2 | **20th** | Elysian's platform invoices (Airbnb + BDC) | **Leased** (Elysian is host) | **E-New Generation** |
-| 3 | **25th** | Platform invoices for B2B units | **B2B** | **The B2B partners** (their cross-European declarations) |
+| 2 | **20th** | Elysian's **platform invoices** (Airbnb + BDC PDFs) | **Leased** (Elysian is host) | **E-New Generation** |
+| 3 | **25th** | **Platform invoices** for B2B units | **B2B** | **The B2B partners** (their cross-European declarations) |
 | — | monthly | VAT return | — | Filed by E-New Generation — **out of scope, never tracked** |
 
-Private owners receive **no** platform invoices. ⚠ The app currently models the invoice work as **one** task line ("Invoices to Accountants — B2B + leased", single date) — **splitting it into the two lines above is an approved pending change** (§8).
+**Platform invoices ≠ Oxygen.** Airbnb/Booking.com **host-portal** PDFs (ενδοκοινοτικά) — not Greek expense/myDATA, not Oxygen ΑΠΥ/ΤΠΥ. Tools → Platform Invoices. Doc: `claude/platform-invoices-feature.md`.
+
+**Dating:** Booking.com invoice = **month after** bookings, **one invoice per apartment** (pull parked while Airbnb is hardened). Airbnb **VAT invoice** issue month = Hosthub **`created`** (confirmation). Airbnb **credit note** (on cancel) issue month = Hosthub **`cancelledAt`**. **Airbnb pull = Hosthub `reservationId` (channel reservation_id) → open each confirmation like VAT Invoicer.** **Cadence: ASAP** once documents exist. Elysian-own packs → `info@e-newgeneration.gr` + `info@elysianproperties.eu`. Private owners: none.
+
+⚠ The app long modelled this as **one** Monthly Tasks line (`ota_inv`); Monthly Close + the Platform Invoices tab are the current home — keep the 20th/25th split when working the packs.
 
 Checklist mechanics: month-by-month, defaults to previous month; **proof-required completion** (file ≤15 MB; upload auto-completes; deleting last proof reverts; N/A needs a reason); records who (👤 per-browser name — expect Popi and others) and when; manager (Lefteris) opens proofs via 📎; completed lines pool in the green bottom list with the "left to do" counter; custom recurring tasks supported.
 
@@ -271,7 +275,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (13 Aug 2026 — Airbnb/Booking portal PDFs ≠ Oxygen)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
@@ -298,6 +302,10 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **13 Aug 2026** — Platform invoices: **Airbnb = Hosthub `reservationId` → confirmation-code pull** (VAT Invoicer-style); Booking.com pull parked for now. Doc: `claude/platform-invoices-feature.md`.
+- **13 Aug 2026** — Platform invoices: **pull-first automation** (DB portal sessions, multi-property Booking pull, upload emergency-only). Doc: `claude/platform-invoices-feature.md`.
+- **13 Aug 2026** — Platform invoices: Booking.com = **one invoice per apartment** (Expect/Collect checklist + apartment tagging); 0-PDF portal pull shown as failure. Doc: `claude/platform-invoices-feature.md`.
+- **13 Aug 2026** — Platform invoices SOP: ASAP; Booking.com month-after; Airbnb VAT invoice = Hosthub `created`; Airbnb **credit note** = `cancelledAt` (download both across months if needed); Elysian-own → E-New Generation + info@; no personal names. Tools → Platform Invoices + Hosthub health check + **Playwright portal pull** (`AIRBNB_HOST_*` / `BOOKING_HOST_*`). Doc: `claude/platform-invoices-feature.md`.
 - **v1.3 (5 Aug 2026)** — session 4–5 Aug applied (5 items approved "all"): v12 email-report shipped + §3 delivery line updated; Railway-blocks-SMTP-below-Pro fact + email/Oxygen env vars (§3); connector branch→PR write path + fe/srv-boot patch release mechanics + Em tests + per-domain Chrome permissions (§7); "5 Aug additions" block in §8 (v11 status, v12, SMTP resolution, Oxygen kickoff); new docs referenced (§11): `claude/email-report-feature.md`, `claude/oxygen-integration-spec.md`. Source: session 4–5 Aug 2026; elysian-clearing PRs #3/#4/#5.
 - **v1.2 (27 Jul 2026)** — canonical home moved to the private `lete13/elysian-brain` repo; §12 write path is now branch → pull request → merge (Lefteris's merge = the approval); project copy refreshed from GitHub after merge. Source: setup session 27 Jul.
 - **v1.1 (27 Jul 2026)** — added §12: weekly memory maintenance loop (proposal → per-item approval → versioned apply; single door, durable-vs-transient, assumptions register, anti-bloat). Source: Lefteris's request, 27 Jul.
