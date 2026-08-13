@@ -151,7 +151,7 @@ Auto-reconciliation Saturday 08:00 Europe/Athens + "✓ Check now". Blocked on O
 
 **Platform invoices ≠ Oxygen.** Airbnb/Booking.com **host-portal** PDFs (ενδοκοινοτικά) — not Greek expense/myDATA, not Oxygen ΑΠΥ/ΤΠΥ. Tools → Platform Invoices. Doc: `claude/platform-invoices-feature.md`.
 
-**Dating:** Booking.com invoice = **month after** bookings, **one invoice per apartment**. Airbnb **VAT invoice** issue month = Hosthub **`created`** (confirmation). Airbnb **credit note** (on cancel) issue month = Hosthub **`cancelledAt`** — download both when confirm and cancel fall in different months. **Cadence: ASAP** once documents exist. Elysian-own packs → `info@e-newgeneration.gr` + `info@elysianproperties.eu`. Private owners: none.
+**Dating:** Booking.com invoice = **month after** bookings, **one invoice per apartment** (pull parked while Airbnb is hardened). Airbnb **VAT invoice** issue month = Hosthub **`created`** (confirmation). Airbnb **credit note** (on cancel) issue month = Hosthub **`cancelledAt`**. **Airbnb pull = Hosthub `reservationId` (channel reservation_id) → open each confirmation like VAT Invoicer.** **Cadence: ASAP** once documents exist. Elysian-own packs → `info@e-newgeneration.gr` + `info@elysianproperties.eu`. Private owners: none.
 
 ⚠ The app long modelled this as **one** Monthly Tasks line (`ota_inv`); Monthly Close + the Platform Invoices tab are the current home — keep the 20th/25th split when working the packs.
 
@@ -302,6 +302,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **13 Aug 2026** — Platform invoices: **Airbnb = Hosthub `reservationId` → confirmation-code pull** (VAT Invoicer-style); Booking.com pull parked for now. Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices: **pull-first automation** (DB portal sessions, multi-property Booking pull, upload emergency-only). Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices: Booking.com = **one invoice per apartment** (Expect/Collect checklist + apartment tagging); 0-PDF portal pull shown as failure. Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices SOP: ASAP; Booking.com month-after; Airbnb VAT invoice = Hosthub `created`; Airbnb **credit note** = `cancelledAt` (download both across months if needed); Elysian-own → E-New Generation + info@; no personal names. Tools → Platform Invoices + Hosthub health check + **Playwright portal pull** (`AIRBNB_HOST_*` / `BOOKING_HOST_*`). Doc: `claude/platform-invoices-feature.md`.

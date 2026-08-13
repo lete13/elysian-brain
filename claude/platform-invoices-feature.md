@@ -45,23 +45,25 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 
 ## Automated pull (no monthly PDF upload)
 
-**Normal path:** Platform Invoices → Collect → **Pull from portals**. Clearing runs `scripts/platform-invoice-pull.js` (Playwright/Chromium), walks **every Booking.com property** (one invoice each), tags apartments, and stores PDFs (`source=portal`). **Booking.com always via https://admin.booking.com/**.
+### Airbnb (primary — VAT Invoicer workflow, internal)
 
-**One-time Connect** (only when captcha/OTP blocks password login): run `platform-invoice-save-session.js --headed` on a laptop, then **Connect Airbnb/Booking** in the app (sessions stored in DB and refreshed after successful pulls). This is *not* uploading invoice PDFs.
+Same idea as VAT Invoicer: while logged into Airbnb hosting, use **reservation confirmation codes** and open each reservation to capture VAT invoice / credit note PDFs.
+
+1. Hosthub sync maps calendar-event **`reservation_id`** → booking **`reservationId`** (Airbnb confirmation code).  
+2. Platform Invoices → **Expect** lists codes for the document month (invoice = `created` / `createdOnChannel`; credit note = `cancelledAt`).  
+3. **Collect → Pull Airbnb (Hosthub codes)** sends those codes to `scripts/platform-invoice-pull.js`.  
+4. Worker opens `https://www.airbnb.com/hosting/reservations/details/{CODE}` per code and stores PDFs (`source=portal`).
+
+No manual pasting of codes. Re-sync Hosthub if Expect shows “missing code”.
+
+**One-time Connect** (only when captcha/OTP blocks password login): run `platform-invoice-save-session.js --headed` on a laptop, then **Connect Airbnb** in the app (session vault). This is *not* uploading invoice PDFs.
 
 **Emergency only:** manual PDF upload under Collect → “Emergency manual tools”.
 
-**Manual portal steps** (same dating rules) if automation is offline:
+### Booking.com (parked for now)
 
-### Airbnb
-1. Hosting → reservations → All  
-2. Filter to listings where tax responsibility falls to Elysian  
-3. Open reservation → **VAT Invoice** → save PDF  
-4. If cancelled → also download the **credit note**  
-5. File in Accounting Dropbox by month; name by apartment + sequence  
-6. Verify counts with Hosthub health check (created month vs cancel month)
+Booking.com pull (admin.booking.com, one invoice per apartment, month-after dating) remains in the worker but is **not** the Collect focus while Airbnb Hosthub-code pull is hardened. Manual fallback if needed:
 
-### Booking.com
 1. admin.booking.com → Finance → Invoices  
 2. Select month → download outstanding documents  
 3. File under apartment / month / Booking  
@@ -85,15 +87,15 @@ When Elysian’s own packs for month X are filed, send one completion notificati
 Primary nav tab for Accounting (also Admin). Guided pipeline in one place:
 
 1. **Start** — pick document month  
-2. **Expect** — Hosthub health check (Airbnb created / cancelledAt; Booking.com **apartments** for M−1)  
-3. **Collect** — apartment checklist; **Pull from portals** (auto); Connect sessions once if needed; upload is emergency-only  
-4. **Review** — vault vs expect (gates warn if Booking apartments missing)  
-5. **Ship** — email finished Elysian pack to accountants (`info@e-newgeneration.gr`, `info@elysianproperties.eu`); warns again if apartments incomplete  
+2. **Expect** — Hosthub Airbnb confirmation codes (`reservationId`) for created / cancelledAt; Booking expect dimmed while parked  
+3. **Collect** — Airbnb code checklist; **Pull Airbnb (Hosthub codes)**; Connect Airbnb once if needed; upload is emergency-only  
+4. **Review** — vault vs Airbnb expect  
+5. **Ship** — email finished Elysian pack to accountants (`info@e-newgeneration.gr`, `info@elysianproperties.eu`)  
 
-A **0 PDF** pull is a failure with portal error text — **Connect** the blocked session and Pull again (do not treat monthly PDF upload as the process).  
+A **0 PDF** pull is a failure with portal error text — **Connect** Airbnb and confirm Hosthub codes, then Pull again (do not treat monthly PDF upload as the process).  
 
 ### Hosthub fields
-- `platform` · `created` / `createdOnChannel` · `cancelled` / `cancelledAt` · `aptId` / `aptName`
+- `platform` · **`reservationId`** (channel `reservation_id` — Airbnb confirmation code) · `created` / `createdOnChannel` · `cancelled` / `cancelledAt` · `aptId` / `aptName`
 
 ### Env
 `PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `AIRBNB_HOST_EMAIL` / `AIRBNB_HOST_PASSWORD` · `BOOKING_HOST_EMAIL` / `BOOKING_HOST_PASSWORD` — see clearing `scripts/platform-invoice-pull.md`.
