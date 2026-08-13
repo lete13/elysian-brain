@@ -1,51 +1,92 @@
-# Platform invoices (Airbnb / Booking.com) — started 13 Aug 2026
+# Platform invoices (Airbnb / Booking.com)
+
+State as of 13 Aug 2026. Aligns the app with the internal **Invoices Accounting Process** SOP (no individual names in this doc).
 
 ## What these are (and are not)
 
 | | **Platform invoices** | **Oxygen ΑΠΥ / ΤΠΥ** |
 |---|---|---|
 | Issued by | **Airbnb** or **Booking.com** | **Elysian** (via Oxygen) |
-| Issued to | Elysian (as host) | Owner / B2B partner |
+| Issued to | Elysian / the host of record | Owner / B2B partner |
 | Purpose | Platform fees / commissions | Management fee, cleaning, etc. |
 | Greek system | **Ενδοκοινοτικά** — do **not** appear in Greek expense / myDATA imports | Sent to myDATA through Oxygen |
-| Source today | **Host portals** (Airbnb + Booking.com extranet) | Monthly Close → Email |
+| Source | **Host portals** (Airbnb hosting + Booking.com extranet) | Monthly Close → Email |
 
-**Never conflate the two.** Oxygen is live for owner documents. Platform invoices are a separate monthly handoff.
+**Never conflate the two.**
 
-## Monthly process
+---
 
-These are **previous-month** invoices. As soon as a calendar month ends, the host-portal PDFs for that month can be pulled and sent — **do not wait for the 20th/25th**. Those dates are only the **latest** safe handoff points in the close calendar, not the preferred start.
+## Cadence — as soon as possible
 
-| Wave | Latest by | Scope | Recipient | Preferred timing |
-|---|---|---|---|---|
-| 2 | **20th** | **Leased** (Elysian is host) | **E-New Generation** | **Early in the month** once July/previous-month portal invoices are available |
-| 3 | **25th** | **B2B** | Each **B2B partner** | Same — as soon as ready; 25th is the backstop |
-| — | — | Private | **None** | — |
+These are **previous-period** portal documents. Start the pull **as soon as the month’s invoices are available** after month-end. Do **not** wait for mid-month close deadlines.
 
-## App (elysian-clearing)
+Historical SOP backstop was “by the 15th after clearings”; preferred rule now: **ASAP**. The 20th/25th close waves are unrelated Oxygen/TAKK/report deadlines — platform packs should already be done by then.
 
-**Tools → Platform Invoices** (`platinv`):
+---
 
-1. Pick the month (defaults to previous month).
-2. **Upload** PDFs downloaded from the Airbnb / Booking.com host portals (or wait for portal pull).
-3. Tag scope: **leased** or **b2b** (+ partner name for B2B).
-4. **Email pack** — leased uses `PLATFORM_INVOICE_ACCOUNTANT_EMAIL`; B2B asks for the partner email.
-5. **Pull from portals** — credentials gate is live; browser download is the next build (`scripts/platform-invoice-pull.md`).
+## How each channel dates an invoice (critical)
 
-### API
+### Booking.com
+- Booking.com **summarises all reservations of a calendar month** and cuts **one invoice the month after**.
+- Example: all **June** bookings → invoice issued in **July** (a **July** invoice covering June activity).
+- When working month **M** in the app, Hosthub health-check for Booking.com looks at bookings **created in month M−1**.
 
-- `GET /api/platform-invoices/status`
-- `GET /api/platform-invoices?month=YYYY-MM`
-- `POST /api/platform-invoices` (base64 upload)
-- `DELETE /api/platform-invoices/:id`
-- `POST /api/platform-invoices/send` `{ month, scope, partner?, to? }`
-- `POST /api/platform-invoices/pull` `{ month }`
+### Airbnb
+- Airbnb generates an invoice **when the booking is confirmed**, not when the guest stays.
+- Book today for next summer → invoice date is **today**. A booking can be **cancelled months later**, so the invoice month and the stay month often diverge — hard to track from check-in alone.
+- Hosthub health-check for Airbnb uses the booking’s **created / confirmed** timestamp month/year (same month/year as the invoice), and separately flags confirmations that month which later cancelled.
 
-### Railway env
+---
 
-`PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `AIRBNB_HOST_EMAIL` · `AIRBNB_HOST_PASSWORD` · `BOOKING_HOST_EMAIL` · `BOOKING_HOST_PASSWORD`
+## Manual portal steps (source of truth until auto-pull lands)
 
-## Related brain docs
+### Airbnb
+1. https://www.airbnb.com/hosting/reservations → All  
+2. Filter to listings where **tax responsibility falls to Elysian** (property-details / Configuration).  
+3. Open reservation → **VAT Invoice** → Print → Save as PDF.  
+4. Save to the Accounting Dropbox Airbnb folder for that month.  
+5. Name by apartment name + sequence number.  
+6. Verify count against Hosthub (booked/confirmed in that invoice month).
 
-- Oxygen / Monthly Close owner documents: `claude/monthly-close-and-oxygen.md`, `claude/oxygen-integration-spec.md`
-- Checklist history (old Monthly Tasks line `ota_inv`): `claude/monthly-tasks-feature.md`
+### Booking.com
+1. admin.booking.com → Finance → Invoices  
+2. Select month → generate / download outstanding documents PDF.  
+3. File under apartment / platform invoices / month / Booking.  
+4. Split into apartment folders by number.  
+5. Remember: invoice month = **month after** the bookings month.
+
+---
+
+## Completion reporting (no personal names)
+
+| Group | Delivery | Recipients |
+|---|---|---|
+| **Elysian’s own units** (tax responsibility Elysian) | Notification + internal folders | `info@e-newgeneration.gr` and `info@elysianproperties.eu` |
+| **External / partner groups** (e.g. Verandas, Monograph, Cedar cluster, Le* Thessaloniki set) | Email attachments + internal folders | That group’s accountant / owner emails (kept in the private process table / Configuration — not listed as people here) |
+
+When Elysian’s own packs for month X are uploaded and filed, send one **completion notification** (subject like `PLATFORM INVOICES MONTH/YEAR`) to the Elysian + E-New Generation addresses above.
+
+---
+
+## App — Tools → Platform Invoices
+
+1. Pick the **invoice month** (defaults to previous calendar month).  
+2. Run **Hosthub health check** (expected Airbnb confirmations that month; Booking.com bookings from the prior month).  
+3. Upload PDFs from the portals (or portal pull when live).  
+4. Email packs — leased/Elysian default → accountant env / E-New Generation; other groups → their addresses.  
+
+### API / env
+See clearing `scripts/platform-invoice-pull.md`.  
+`PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · Airbnb/Booking host credentials for pull.
+
+### Hosthub fields used for the check
+- `platform` (Airbnb / Booking.com)  
+- `created` / `createdOnChannel` (unix seconds — confirmation / booked-on-channel time)  
+- `cancelled` / `cancelledAt` (Airbnb late-cancel warning)  
+- Apartment profile / tax-responsibility filter when available (`leased` ≈ Elysian host)
+
+---
+
+## Related
+- Oxygen owner documents: `claude/monthly-close-and-oxygen.md`  
+- Old checklist line `ota_inv`: `claude/monthly-tasks-feature.md`
