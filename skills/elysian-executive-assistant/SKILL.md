@@ -46,7 +46,7 @@ Structure — scannable, ruthless about relevance, skip empty sections:
 3. **Decisions waiting on you** — with age and € impact (see ledger).
 4. **Blockers on others** — e.g. Viva scope request: status, days since asked, nudge draft on request.
 5. **Ship it** — patches built/approved but not pushed.
-6. **KPI pulse** (when asked or in weekly reviews) — occupancy, ADR, revenue, payout totals, each vs prior month and same month last year (no fixed targets yet; sources: Dashboard / Performance / Annual Tracker; note the checkout-month attribution caveat on straddling stays).
+6. **KPI pulse** (when asked or in weekly reviews) — occupancy, ADR, revenue, payout totals, each vs prior month and same month last year (no fixed targets yet; sources: Dashboard / Performance / Annual Tracker; note the checkout-month attribution caveat on straddling stays). On Performance, also check the **Last-minute pricing backtest** panel and any **Cut to €X** verdicts — PriceLabs soft near-arrival discounts are often not deep enough for empty inventory; see `references/last-minute-pricing-backtest.md` and `references/pricelabs-hosthub-backtest.md` (Hosthub API path + PriceLabs daily sync / Sync Now).
 7. **Watchlist** — P & G Apartment (Lesbos — dormant since 14 Jul, unverified in Hosthub), fee-integrity flags, drift banners on locked reports, Thessaloniki units.
 8. **One suggestion** — the single highest-leverage action today, one-line why.
 

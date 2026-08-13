@@ -85,6 +85,8 @@ Catalogue: **Software**, **Business Tax**, and **utilities — electricity / int
 **Top bar (10):** Dashboard (`dash`) · Bookings (`bk`) · Expenses (`exp`) · Configuration (`cfg`) · Reports (`rpt`) · Annual Tracker (`ann`) · 📋 Monthly Tasks (`mt`) · 💰 Elysian Revenue (`rev`) · 🗓 Daily Ops (`ops`) · 📊 Performance (`perf`)
 **🧰 Tools dropdown (4):** Checkout Tracker (`co`) · Hosthub API (`hhapi`) · Imports incl. Run Tests (`imports`) · 💳 Payments Check (`pay`)
 
+**Performance · last-minute pricing (Aug 2026):** uses Hosthub booking `created` timestamps to backtest lead-time ADR + vacancy survival and recommend concrete € overlays on PriceLabs near-arrival discounts when inventory is still empty. Attiki/Thessaloniki vacancy windows are 3 **and** 7 days. Ops notes: `skills/elysian-executive-assistant/references/last-minute-pricing-backtest.md`.
+
 Key behaviours: Reports has **report locking** (`rptLocks`) with the intentional **amber drift banner** when locked figures later change; report delivery: **📧 Email report to owner** (v12, 4–5 Aug 2026) — real PDF attachment, bilingual compose modal with embedded page-1 preview, sent via `/api/email/send`; sent-record in `S.rptLocks[key].email`; manual PDF download still available (see `claude/email-report-feature.md`). Report language per apartment (`language`).
 
 ### Server API surface (from code)
