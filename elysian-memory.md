@@ -273,7 +273,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (13 Aug 2026 — Airbnb/Booking portal PDFs ≠ Oxygen)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
