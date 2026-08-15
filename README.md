@@ -15,6 +15,8 @@ Private knowledge base — the canonical home of Elysian's memory document, feat
 - `claude/` — feature docs for the Elysian Clearing app
   - `platform-invoices-feature.md` — Airbnb/Booking.com host-portal invoices → accountants (≠ Oxygen)
   - `monthly-close-and-oxygen.md` — Monthly Close + Oxygen owner documents
+  - `payments-check-feature.md` · `monthly-tasks-feature.md` · `oxygen-integration-spec.md` · `email-report-feature.md`
+  - `code-health-features-performance.md` — 15 Aug 2026 review: bugs/dead ends, feature suggestions, performance (proposal only; not a memory-doc edit)
 - `skills/` — sources for the Claude skills (`elysian-accountant`, `elysian-executive-assistant`)
 
 Created 27 Jul 2026.
