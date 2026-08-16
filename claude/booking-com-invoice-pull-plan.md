@@ -202,6 +202,7 @@ All of this lands in `elysian-clearing` as follow-up PRs. This brain doc does no
 
 - Session chip already shows Booking.com — keep it.
 - Buttons: **Pull Booking.com** (mass extract for the month) · **Stop pull** · Connect Booking only if the logged session expired
+- `POST /api/platform-invoices/pull` with `channel: 'booking'`
 - Pass `apartments: [{ aptId, aptName, bookingHotelId }]` so the worker can file without name matching
 - 0 PDF = failure with reconnect / too-early hints
 
