@@ -10,6 +10,9 @@ State as of **16 Aug 2026** (Lefteris confirmed: **one invoice per apartment**; 
 - All **June reservations** are on that **one July invoice**.
 - The **July** BDC folder holds **one PDF** (June reservations inside it) — never one PDF per reservation, never file it under June.
 - **No Excel** for Booking.com. Ship the PDFs only.
+- A **Finance-capable Booking session is already logged** (session vault). Pull reuses it.
+- The Extranet can **mass-extract all apartment invoices for a month** in one action. That is the pull.
+- Invoices print the **Booking apartment id only** (not the Elysian name). Filing needs a **Booking id → apartment** map on Configuration.
 
 ---
 
@@ -39,8 +42,9 @@ In `lete13/elysian-clearing`:
 |---|---|
 | Vault + Review folders | Live. `Booking.com/{YYYY-MM}/{apartment}/invoice-….pdf` |
 | `POST /api/platform-invoices/pull` with `channel=booking` | Live API; Collect UI currently sends **Airbnb only** |
-| Session vault `pi_portal_session_booking` | Live (`Connect` / `BOOKING_STORAGE_STATE_B64` / `BOOKING_HOST_*`) |
-| Worker `scripts/platform-invoice-pull.js` → `pullBooking()` | **Parked heuristic** — guessed Finance URLs, first-PDF-per-property, name fuzzy-match |
+| Session vault `pi_portal_session_booking` | **Logged, Finance-capable** (16 Aug 2026). Pull reuses this; Connect is not a blocker |
+| Worker `scripts/platform-invoice-pull.js` → `pullBooking()` | **Parked heuristic** — guessed per-property URLs and **name** fuzzy-match. Replace with **month mass-extract + Booking-id map** |
+| Booking id on `S.apts` | **Missing.** Invoices only show Booking apartment id. This map is the remaining identity work |
 | Expect | Unique apartments with June BDC **reservations** → one July invoice each (booking count is context only) |
 | Accountant Excel | **Airbnb only.** Confirmed: **no Excel for Booking.com** — Ship attaches the PDFs |
 | Collect UI | Booking checklist hidden; copy says pull is parked |
@@ -102,54 +106,31 @@ Guest-pays-at-property units still get that **one monthly invoice** even when Ho
 
 ---
 
-## Capture strategy (Airbnb lesson, applied here)
+## Capture strategy — mass extract per month
 
-Airbnb only worked after a live session showed: stay page → fetch `/invoice/{token}` → **new tab on `www.airbnb.gr`**. Guessed `.com` address-bar URLs 404’d.
+The Extranet already lets a Finance user **mass-extract every apartment’s invoice for a chosen month**. Pull drives that same action. Do **not** walk 50+ property homepages.
 
-Booking.com pull must follow the same sequence: **record a real session, then code to that path**.
+1. Reuse the logged Finance session (`pi_portal_session_booking`).
+2. Open group **Finance → Invoices**.
+3. Select document month **M** (July = June reservations).
+4. Run the **mass extract** for that month → one commission PDF per apartment.
+5. From each PDF, read the **Booking apartment id** (the only apartment key on the invoice).
+6. Look up `S.apts.bookingHotelId` → Elysian apartment name.
+7. File as `Booking.com/{M}/{elysian-name}/invoice-{bookingId}-{invoiceNo}.pdf`.
 
-### Preferred path — group Finance list
+Phase 0 records the mass-extract control (button/filter/download), not login.
 
-If the host login lands on the **group Extranet** (likely with this portfolio):
+Per-property Finance URLs stay emergency fallback only. Drop `matchApartment()` name matching — invoices do not carry Elysian names.
 
-1. `admin.booking.com` → group home
-2. **Finance → Invoices**
-3. Filter so we get the invoices **issued in month M** (July invoices = June reservations). Confirm the Extranet control in Phase 0 — it may be labelled issue month or reservation month.
-4. Download **one commission invoice PDF per apartment**
-5. Parse property id + invoice number + issue date + amount from the PDF (or the table row)
-6. File under `Booking.com/{M}/{apartment}/` — July folder for the June-reservations invoice
-
-Partner Help mentions filtering group downloads by checkout month — treat that as Extranet UI labelling. The filing rule is Lefteris’s: **July folder = one invoice of June reservations.**
-
-This is the only path that can pull **all** properties in one job without walking 50+ property homepages.
-
-### Fallback path — per-property Finance
-
-If group Finance does not expose PDF download (only pay/status), keep the existing idea: open each property’s `hotel_id` → Finance → Invoices → that month’s PDF.
-
-Do **not** ship the current guessed URL list as-is:
-
-```
-…/extranet_ng/manage/finance/invoices.html
-…/extranet_ng/manage/finance/invoice.html
-…/finance_invoices.html
-…/finance/invoices.html
-…/documents.html
-```
-
-Those stay as *candidates after the headed recording*, not the design.
-
-### Capture mechanism (decide in Phase 0)
+### Capture mechanism (record in Phase 0)
 
 In order of preference, once network traffic is visible:
 
-1. **Authenticated fetch** of the PDF URL the Extranet already uses (cookie/session from Playwright) — most stable
-2. Playwright `download` event on the real “Download PDF” control
-3. Open invoice HTML and `page.pdf()` only if there is no file download (Airbnb-style)
+1. **Authenticated fetch** of the PDF URLs the mass extract already uses
+2. Playwright `download` events from the mass-extract action
+3. `page.pdf()` only if there is no file download
 
 Never PDF a Finance shell, login wall, or reservation-statement HTML.
-
-Current worker stops after the first PDF per property — that part of the heuristic matches the **one invoice** rule. What it does **not** do is land on the real Invoices page or file into `Booking.com/2026-07/{apt}/` with June reservations. Phase 0 still has to record the real URL.
 
 ---
 
@@ -171,34 +152,35 @@ Do not use “Hosthub booking count” as the PDF target. Ten June reservations 
 
 ---
 
-## Apartment identity (do not rely on fuzzy names)
+## Apartment identity — Booking id map (the remaining piece)
 
-Today `matchApartment()` compares scraped property titles to Hosthub names. That will mis-file across similar titles.
+Invoices **do not name** the Elysian apartment. They only print the **Booking.com apartment / hotel id**. Fuzzy name matching cannot work.
 
-Stable key is Booking.com **hotel / accommodation number** (on the invoice and in `hotel_id=` URLs).
+Add `bookingHotelId` on Configuration (`S.apts`), same class of per-apartment field as `aliases`. One id per unit that is listed on Booking.com.
 
-Plan:
+Pull then:
 
-1. Phase 0 recording stores `hotel_id` per downloaded PDF.
-2. Add optional `bookingHotelId` on Configuration (`S.apts`) — filled once from the first successful pull (or a small mapping table), then reused.
-3. Hosthub rental payloads may already carry a Booking listing id — check during implementation; do not assume they do (sync today maps `reservation_id` but not a hotel id onto apartments).
-4. Name match stays a last-resort hint, never the only key.
+1. Parse Booking apartment id from the PDF (and from the mass-extract row if present).
+2. Look up `S.apts` where `bookingHotelId` equals that id.
+3. File under that apartment’s `name`.
+4. If no row matches: store under `Booking.com/{M}/unmapped-{bookingId}/` and list it on Review as **needs mapping**. Completeness fails until it is mapped and refiled. Never guess a folder from the PDF text.
 
-Filenames: `Booking.com/{month}/{apartment}/invoice-{hotelId}-{invoiceNo}.pdf`. One file per apartment per month.
+Fill the map **once**:
+
+- Manual: Configuration field per apartment (authoritative).
+- Optional assist: group Extranet property list often shows **name + id** even though the PDF does not — a one-time seed, then human confirm. Hosthub `/rentals` is **not** known to store this id today (sync maps `reservation_id`, not a hotel id).
+
+Filenames: `Booking.com/{month}/{apartment}/invoice-{bookingId}-{invoiceNo}.pdf`. One file per apartment per month.
+
+Do **not** use `matchApartment()` on invoice titles.
 
 ---
 
 ## Session / Connect
 
-Mirror Airbnb, do not invent a second auth stack.
+**Done (16 Aug 2026):** a Booking.com session with **Finance** permission is logged in the vault. Pull uses `pi_portal_session_booking` and refreshes it after a successful visit (`--save-sessions`).
 
-1. **Connect Booking** in Platform Invoices (in-app browser or paste `storageState`). 2FA/captcha is expected on password login from Railway.
-2. Pull reuses `pi_portal_session_booking` and refreshes it after a successful visit (`--save-sessions`).
-3. Login name + password env is fallback only. If captcha appears, fail with “Connect Booking”, do not retry in a loop.
-4. The connected account **must** have Finance permission. A session that can see reservations but not Invoices is a hard error.
-5. Optional `PLAYWRIGHT_PROXY_SERVER` if Airlock/bot checks block the Railway IP (already documented for Airbnb).
-
-Laptop helper already exists: `scripts/platform-invoice-save-session.js --channel=booking --headed`.
+If a later pull hits login/captcha: Connect Booking again (same Airbnb pattern). Password env is fallback only. Do not retry captcha in a loop.
 
 ---
 
@@ -219,27 +201,31 @@ All of this lands in `elysian-clearing` as follow-up PRs. This brain doc does no
 ### Collect UI
 
 - Session chip already shows Booking.com — keep it.
-- Buttons: **Connect Booking** · **Test pull (2 apartments)** · **Pull Booking.com** · **Stop pull**
-- `POST /api/platform-invoices/pull` with `channel: 'booking'` (Airbnb stays `channel: 'airbnb'`; do not silently run `all` until both are proven)
-- Same in-memory job / resume / stop behaviour as Airbnb
-- 0 PDF = failure with reconnect / too-early / missing Finance permission hints
+- Buttons: **Pull Booking.com** (mass extract for the month) · **Stop pull** · Connect Booking only if the logged session expired
+- Pass `apartments: [{ aptId, aptName, bookingHotelId }]` so the worker can file without name matching
+- 0 PDF = failure with reconnect / too-early hints
 
 ### Worker
 
-Replace `listBookingProperties` + `downloadBookingInvoicesForProperty` with a path recorded in Phase 0:
+Replace `listBookingProperties` + `downloadBookingInvoicesForProperty` with month mass-extract:
 
-1. Open group Finance → Invoices (preferred) or per-`hotel_id` fallback
-2. Apply month filter
-3. Download **one** commission invoice PDF per apartment (the June-reservations invoice into the July folder)
-4. Parse meta; map `hotel_id` → apartment
+1. Open group Finance → Invoices with the logged session
+2. Run **mass extract** for month M
+3. For each PDF: parse **Booking apartment id** (required)
+4. Map id → `S.apts` via `bookingHotelId`; unmapped → `unmapped-{id}`
 5. Store via existing `piInvoiceStoreRel` as `Booking.com/{M}/{apt}/…`
 6. Emit `saved` / `progress` JSON like Airbnb so the job poller works
-7. Flag Expect apartments with 0 PDFs; flag apartments with **more than one** PDF in that month’s folder
+7. Flag Expect apartments with 0 PDFs; flag **more than one** PDF in that month’s folder; flag unmapped ids
 
 ### Parser (no Excel)
 
-- Parse invoice number, issue date, total, hotel id from PDF text (for Review chips and completeness).
+- Parse **Booking apartment id** (required), invoice number, issue date, total.
 - **Do not** add a Booking.com sheet to `Airbnb-VAT-YYYY-MM.xls`. Confirmed: accountants get BDC **PDFs only**. The existing Excel skip for `channel=booking` stays.
+
+### Configuration
+
+- New optional field `bookingHotelId` on each apartment (Configuration tab). Empty = not listed on Booking, or not mapped yet.
+- Collect/Review shows unmapped Booking ids from the latest pull so they can be pasted onto the right apartment once.
 
 ### Backfill
 
@@ -249,29 +235,29 @@ Separate job flag `backfill=true` (or month=`all` with a year filter): walk Extr
 
 ## Phased delivery
 
-### Phase 0 — headed discovery (blocks coding)
+### Phase 0 — record the mass extract (session already logged)
 
-Needs Lefteris: **Connect Booking** once (Finance-capable login). Then one headed Playwright session (laptop or in-app) against a **known month that already has invoices** (not the 1st–2nd of a new month).
+Session is **not** the blocker. Record, with the logged Finance session, a month that already has invoices:
 
-Record:
+1. Exact Invoices URL and the **mass extract** control
+2. Network: ZIP vs per-PDF downloads
+3. Where the **Booking apartment id** sits on the PDF (and on the extract list)
+4. That July’s files are one per apartment and list June reservations
+5. Empty state before the first week of the month
 
-1. Group vs single-property landing page
-2. Exact Invoices URL(s) and the month-filter control
-3. Network: PDF hrefs vs blob vs HTML viewer
-4. Confirm one PDF per property (not per reservation)
-5. Where `hotel_id` / property name / invoice number appear
-6. Whether “too early” has a distinct empty state
-7. That the July invoice’s reservation list is June reservations
+Output: addendum in this file (selectors, id pattern) plus a redacted PDF-text fixture in clearing `tests/` (no live credentials).
 
-Output: a short addendum in this file (URLs, selectors, one redacted example row) plus 1–2 fixture HTML/PDF snippets in clearing `tests/` (no live credentials).
+### Phase 0b — Booking id map (blocks filing)
+
+Add `bookingHotelId` on Configuration. Seed from Extranet name+id if useful; Lefteris confirms. Unmapped PDFs must not land in a guessed apartment folder.
 
 ### Phase 1 — Test pull (2 apartments, one month)
 
-Worker + Collect **Test pull**. Success = **two** apartments, **one** July invoice PDF each, filed under `Booking.com/2026-07/{apt}/`, reservation list is June. Same bar as Airbnb’s two-code proof.
+Mass extract the month, map two known Booking ids, file **one** July PDF each under the right Elysian folders.
 
 ### Phase 2 — Full month vs Expect
 
-Pull all properties for that month. Completeness: each Expect apartment has **exactly one** PDF in the July folder. Then un-hide Collect **Pull Booking.com**.
+Mass extract all apartments. Completeness: each Expect apartment has **exactly one** PDF; zero unmapped ids. Then un-hide Collect **Pull Booking.com**.
 
 ### Phase 3 — Ship + backfill
 
@@ -285,9 +271,10 @@ Elysian pack **attaches the BDC PDFs**. No Booking.com Excel. Optional historica
 |---|---|
 | `estimateBookingInvoices` | Two June reservations, same apt → **one** July expect row; apartment with no June reservations → not listed |
 | Fixture invoices page | Worker finds **one** PDF target per property; skips XLS/CSV |
-| Parser | Invoice number, issue date, total, hotel id from a redacted text fixture |
+| Parser | Booking apartment id + invoice number from a redacted text fixture |
+| Map | Known `bookingHotelId` → Elysian folder; unknown id → `unmapped-{id}`, never a name guess |
 | Vault path | July collect → `Booking.com/2026-07/Apt/invoice-….pdf` (June reservations stay in the July folder) |
-| Completeness helper | Missing Expect apartments flagged; **two PDFs in one apt/month folder** flagged; 0 PDF is failure unless `tooEarly` |
+| Completeness helper | Missing Expect apartments flagged; **two PDFs in one apt/month folder** flagged; unmapped ids fail the month; 0 PDF is failure unless `tooEarly` |
 | Excel | `buildAccountantXls` still **skips** Booking.com (permanent) |
 
 No live `admin.booking.com` in CI. Live proof is a Collect job id, like Airbnb `ppmsuw193wm05or`.
@@ -302,7 +289,8 @@ No live `admin.booking.com` in CI. Live proof is a Collect job id, like Airbnb `
 | Extranet UI churn | Prefer fetch of recorded PDF URLs over brittle clicks |
 | Pull on the 1st–6th | Explicit too-early error; retry after the 7th |
 | Two PDFs in one July folder | Completeness fails; keep the commission invoice, drop statements |
-| Mis-filed apartments | `hotel_id` mapping; name match last |
+| Unmapped Booking id | Hold in `unmapped-{id}`; do not name-match; map on Configuration then refile |
+| Mis-filed apartments | **Only** `bookingHotelId`; never invoice titles |
 | June PDF filed under June | Archive month is the **invoice** month (July) |
 | In-memory pull jobs die on deploy | Same Airbnb limitation; Stop + resume by month+channel |
 | Public clearing repo | No credentials, no ΑΦΜ, no live invoice dumps in git |
@@ -326,11 +314,14 @@ Confirmed 16 Aug 2026:
 
 1. **One invoice per apartment.** July BDC folder = one PDF whose reservations are June’s.
 2. **No Excel for Booking.com.** Ship PDFs only.
+3. **Finance session is logged.** Mass extract of all apartments per month is the pull.
+4. Invoices carry **Booking apartment id only** — Configuration needs `bookingHotelId`.
 
 Still needed:
 
-1. Connect a Finance-capable Booking session
-2. Pick the first live test month (one that already has invoices on the Extranet)
+1. Fill `bookingHotelId` on apartments that are on Booking.com
+2. Record the mass-extract control (Phase 0) on a month that already has invoices
+3. First live test month
 
 ---
 

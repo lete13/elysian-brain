@@ -14,7 +14,7 @@ Private knowledge base — the canonical home of Elysian's memory document, feat
 - `elysian-memory.md` — the master memory document (versioned; changelog at the bottom)
 - `claude/` — feature docs for the Elysian Clearing app
   - `platform-invoices-feature.md` — Airbnb/Booking.com host-portal invoices → accountants (≠ Oxygen)
-  - `booking-com-invoice-pull-plan.md` — unpark Booking.com: one July PDF per apartment (June reservations); no BDC Excel
+  - `booking-com-invoice-pull-plan.md` — unpark Booking.com: month mass-extract + `bookingHotelId` map; one July PDF per apt; no BDC Excel
   - `monthly-close-and-oxygen.md` — Monthly Close + Oxygen owner documents
 - `skills/` — sources for the Claude skills (`elysian-accountant`, `elysian-executive-assistant`)
 

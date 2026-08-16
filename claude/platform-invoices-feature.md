@@ -29,7 +29,9 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 - Vault: `Booking.com/2026-07/{apartment}/` holds **exactly one** PDF — that PDF’s reservation list is June. Do not file one PDF per booking, and do not put the June invoice under the June folder.
 - Hosthub expect for document month **July** = unique apartments with Booking.com **reservations in June**. Booking count is context only (`N reservations → 1 PDF`).
 - **No Excel** for Booking.com. Ship the PDFs only (`Airbnb-VAT-YYYY-MM.xls` stays Airbnb).
-- Pull remains **parked** until `claude/booking-com-invoice-pull-plan.md` is executed. Manual fallback: admin.booking.com → Finance → Invoices.
+- **Finance session is logged.** Pull is a **mass extract of all apartments for the month** (group Finance → Invoices), not one property at a time.
+- Invoices print the **Booking apartment id only**. Filing needs `bookingHotelId` on Configuration (`S.apts`) → Elysian name. Unmapped ids stay in `unmapped-{id}` until mapped. Do not guess from names.
+- Pull remains **parked** until `claude/booking-com-invoice-pull-plan.md` is executed (map + mass extract). Manual fallback: admin.booking.com → Finance → Invoices → mass extract for the month.
 
 ### Airbnb — two different date jobs
 
@@ -101,9 +103,9 @@ Booking.com pull (admin.booking.com, one invoice per apartment, month-after dati
 
 Manual fallback if needed:
 
-1. admin.booking.com → Finance → Invoices (prefer **group** Extranet so every property is on one list)
-2. Take the **July** commission invoice PDF for each apartment (it lists **June** reservations)
-3. File **one PDF** under `Booking.com/2026-07/{apartment}/`
+1. admin.booking.com → Finance → Invoices (group Extranet)
+2. **Mass extract** the **July** invoices (each PDF lists **June** reservations)
+3. File **one PDF** under `Booking.com/2026-07/{apartment}/` using the Booking apartment id map
 4. No Booking.com Excel — PDFs only
 
 ---
