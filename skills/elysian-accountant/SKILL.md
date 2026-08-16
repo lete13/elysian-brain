@@ -14,7 +14,7 @@ You are the accounting copilot for **Elysian** (an ΙΚΕ; the ΑΦΜ is never w
 
 All accounting flows through the custom **Elysian Clearing** app: `lete13/elysian-clearing` (public repo) → Railway auto-deploy (~60 s) → `elysian-clearing-production.up.railway.app`. `index.html` (~628 KB) + `server.js` (Node/Express + PostgreSQL), password-gated (`APP_PASSWORD` / `/api/session`), shared state polled every 60 s.
 
-If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read it first — it is the umbrella source of truth and may be newer than this skill. Also relevant: `claude/monthly-tasks-feature.md`, `claude/payments-check-feature.md`, `claude/platform-invoices-feature.md`.
+If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read it first — it is the umbrella source of truth and may be newer than this skill. Also relevant: `claude/monthly-tasks-feature.md`, `claude/payments-check-feature.md`, `claude/platform-invoices-feature.md`, `claude/booking-com-invoice-pull-plan.md`.
 
 ## Non-negotiable ground rules
 
@@ -68,7 +68,7 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 
 1. **TAKK Issuance** (private apartments) — issue the ειδικό στοιχείο per stay; upload proof per apartment line.
 2. **TAKK Payment** (private apartments) — pay what was issued; proof per line. (Statutory δήλωση deadline is month-end — internal 20th is the buffer; filer confirmation pending.)
-3. **Platform invoices, leased / Elysian-tax units** — pull **ASAP** after portal documents exist. **Dating = the VAT issue date printed on the PDF/HTML**, not Hosthub `created` / `cancelledAt` (those only decide which stay to open). One stay can yield several docs (normal ×1, cancel ×2, 1 extend ×3, n extends × `(1+2n)`); file each under **its own** issue month. In the app: Platform Invoices (Accounting/Admin tab) → month → Expect → Collect → **Pull Airbnb (Hosthub codes)**. **Test pull** = `HM9DCDMEXT` and `HMWRNAWHBA` (not “latest 5”). A **0 PDF** result is a failure. Booking.com pull is parked. Ship = PDFs + `Airbnb-VAT-YYYY-MM.xls` (Πρόσημο `-` on credits) to `info@e-newgeneration.gr` + `info@elysianproperties.eu`. See `claude/platform-invoices-feature.md`.
+3. **Platform invoices, leased / Elysian-tax units** — pull **ASAP** after portal documents exist. **Dating = the VAT issue date printed on the PDF/HTML**, not Hosthub `created` / `cancelledAt` (those only decide which stay to open). One stay can yield several docs (normal ×1, cancel ×2, 1 extend ×3, n extends × `(1+2n)`); file each under **its own** issue month. In the app: Platform Invoices (Accounting/Admin tab) → month → Expect → Collect → **Pull Airbnb (Hosthub codes)**. **Test pull** = `HM9DCDMEXT` and `HMWRNAWHBA` (not “latest 5”). A **0 PDF** result is a failure. Booking.com pull is parked — unpark plan `claude/booking-com-invoice-pull-plan.md` (**one** July PDF per apartment covering June reservations; **Votsala 1–8 = one BDC PDF**; mass extract; **Booking id map**; **no BDC Excel**). Ship = PDFs + `Airbnb-VAT-YYYY-MM.xls` (Airbnb only; Πρόσημο `-` on credits). Booking.com: PDFs only, no Excel. Recipients `info@e-newgeneration.gr` + `info@elysianproperties.eu`. See `claude/platform-invoices-feature.md`.
 
 ### Wave 3 — B2B / external groups (platform invoices)
 
