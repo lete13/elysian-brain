@@ -25,9 +25,9 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 ## How each channel dates documents (critical)
 
 ### Booking.com
-- **One invoice per apartment.** All of an apartment’s **June reservations** are billed on a **single July invoice**.
-- Vault: `Booking.com/2026-07/{apartment}/` holds **exactly one** PDF — that PDF’s reservation list is June. Do not file one PDF per booking, and do not put the June invoice under the June folder.
-- Hosthub expect for document month **July** = unique apartments with Booking.com **reservations in June**. Booking count is context only (`N reservations → 1 PDF`).
+- **One invoice per apartment**, except **Votsala 1–8 share one Booking.com invoice** (same as their Viva payout). File under `Booking.com/2026-07/Votsala/`. Airbnb stays per unit.
+- Vault: `Booking.com/2026-07/{apartment}/` holds **exactly one** PDF — that PDF’s reservation list is June. Votsala’s folder is the group name, not eight copies.
+- Hosthub expect for document month **July** = unique **BDC billing units** with reservations in June (Votsala 1–8 count as **one**). Booking count is context only.
 - **No Excel** for Booking.com. Ship the PDFs only (`Airbnb-VAT-YYYY-MM.xls` stays Airbnb).
 - **Finance session is logged.** Pull is a **mass extract of all apartments for the month** (group Finance → Invoices), not one property at a time.
 - Invoices print the **Booking apartment id only**. Filing needs `bookingHotelId` on Configuration (`S.apts`) → Elysian name. Unmapped ids stay in `unmapped-{id}` until mapped. Do not guess from names.

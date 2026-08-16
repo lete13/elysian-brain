@@ -1,18 +1,19 @@
 # Booking.com invoice pull — plan
 
-State as of **16 Aug 2026** (Lefteris confirmed: **one invoice per apartment**; June reservations → **one July PDF**; **no BDC Excel**). Unparks the Booking.com half of Platform Invoices after the Airbnb Hosthub-code pull went live (15 Aug). Aligns with `claude/platform-invoices-feature.md` and the Invoices Accounting Process SOP (no individual names).
+State as of **16 Aug 2026** (one invoice per apartment except **Votsala = one BDC PDF**; June reservations → July folder; mass extract; Booking id map; **no BDC Excel**). Unparks the Booking.com half of Platform Invoices after the Airbnb Hosthub-code pull went live (15 Aug). Aligns with `claude/platform-invoices-feature.md`.
 
 **This is the plan, not the live worker.** Do not treat the existing `pullBooking()` heuristics as proven. Airbnb already showed that guessed extranet URLs and “click Download” save 0 useful files.
 
 **Confirmed 16 Aug 2026:**
 
-- Booking.com generates **a single invoice per apartment**.
+- Booking.com generates **a single invoice per apartment**, except **Votsala 1–8 share one BDC invoice**.
 - All **June reservations** are on that **one July invoice**.
 - The **July** BDC folder holds **one PDF** (June reservations inside it) — never one PDF per reservation, never file it under June.
 - **No Excel** for Booking.com. Ship the PDFs only.
 - A **Finance-capable Booking session is already logged** (session vault). Pull reuses it.
 - The Extranet can **mass-extract all apartment invoices for a month** in one action. That is the pull.
 - Invoices print the **Booking apartment id only** (not the Elysian name). Filing needs a **Booking id → apartment** map on Configuration.
+- **Votsala is the only BDC grouping exception.** Votsala 1–8 are one Booking.com property (same as the Viva/Payments Check `clearGroup`). **One** July BDC PDF covers all Votsala June reservations. Airbnb stays **per apartment**.
 
 ---
 
@@ -25,7 +26,7 @@ Automatically collect **every Booking.com host-portal invoice PDF** that Elysian
 | Slice | Meaning |
 |---|---|
 | **Going forward** | Every monthly commission invoice as soon as Booking issues them |
-| **Completeness** | **Exactly one PDF per apartment** in that month’s Booking.com folder — not one PDF per reservation |
+| **Completeness** | **One PDF per BDC billing unit** — each apartment, except **Votsala 1–8 share one PDF** |
 | **Document types** | The commission **invoice PDF** only. **Not** reservation-statement XLS/CSV, **not** an accountant Excel |
 | **Backfill** | One historical pass from the Extranet archive (Booking keeps ~5 years behind “Filter by year”) |
 | **Who gets them** | Pull the whole portfolio; **Ship** still splits Elysian-tax (leased) vs B2B partner packs. Private owners get none |
@@ -70,18 +71,21 @@ Invoices are also emailed to the primary address and the Extranet Inbox. Email i
 
 ## Document model (confirmed 16 Aug 2026)
 
-### One invoice per apartment — June reservations live in the July folder
+### One invoice per apartment — except Votsala
 
 Booking.com summarises **all of an apartment’s June reservations into a single invoice issued in July**. The vault matches that:
 
 | Folder | Contents |
 |---|---|
-| `Booking.com/2026-07/{apartment}/` | **Exactly one** invoice PDF. That PDF lists the apartment’s **June** reservations |
-| `Booking.com/2026-08/{apartment}/` | **Exactly one** invoice PDF. That PDF lists the apartment’s **July** reservations |
+| `Booking.com/2026-07/Birdhouse/` | **One** invoice PDF. June reservations for that apartment |
+| `Booking.com/2026-07/Votsala/` | **One** invoice PDF. June reservations for **all Votsala 1–8** |
+| `Airbnb/2026-07/Votsala 1 …/` | Per-unit VAT PDFs (Airbnb is **not** grouped) |
 
-Not one PDF per reservation. Not several July files for the same apartment. Ten June reservations at Birdhouse → **one** file under `Booking.com/2026-07/Birdhouse/`.
+Not one PDF per reservation. Ten June reservations at Birdhouse → **one** file under `Booking.com/2026-07/Birdhouse/`.
 
-Booking.com does **not** issue one combined invoice for the whole group. Each property gets its own PDF. Group Extranet can **list and download** them together.
+**Votsala (BDC only).** Booking.com lists Votsala as one property, the same way payouts land as one Viva credit (`clearGroup: 'Votsala'` on Votsala 1–8, Payments Check Pc16). The mass extract therefore yields **one** Votsala invoice, not eight. File it once under the group folder `Votsala`. Do **not** copy it into Votsala 1…8. Do **not** apply this to any other clearing group (e.g. Michalakopoulou) unless Booking.com also bills them as one property — Lefteris: this grouping **only** applies to Votsala.
+
+Airbnb pull is unchanged: each Votsala unit is its own stay / own VAT PDF.
 
 ### Dating
 
@@ -90,7 +94,7 @@ Booking.com does **not** issue one combined invoice for the whole group. Each pr
 | **July** (`2026-07`) | All **June** reservations for that apartment |
 | **August** (`2026-08`) | All **July** reservations for that apartment |
 
-- **Expect for July** = unique apartments that had Booking.com **reservations in June**. Booking count is context only (`N reservations → 1 PDF`).
+- **Expect for July** = unique **BDC billing units** with reservations in June: each apartment is a unit, except Votsala 1–8 collapse to **one** Votsala row. Booking count is context only.
 - **Archive month** = the invoice month (July folder), not Hosthub `created` on each stay, and not Airbnb-style per-document issue-date refile.
 - Do **not** refile a Booking.com PDF into June because the reservations were in June.
 
@@ -98,7 +102,7 @@ Booking.com does **not** issue one combined invoice for the whole group. Each pr
 
 ### What we store vs skip
 
-Keep: the monthly **commission invoice PDF** (the ενδοκοινοτικά document). One per apartment per folder month.
+Keep: the monthly **commission invoice PDF**. One per BDC billing unit per folder month (Votsala = one file).
 
 Skip: reservation-statement XLS/CSV, Finance overview CSV, Statement of Accounts, and **any Booking.com Excel** for accountants (confirmed: PDFs only).
 
@@ -113,10 +117,10 @@ The Extranet already lets a Finance user **mass-extract every apartment’s invo
 1. Reuse the logged Finance session (`pi_portal_session_booking`).
 2. Open group **Finance → Invoices**.
 3. Select document month **M** (July = June reservations).
-4. Run the **mass extract** for that month → one commission PDF per apartment.
+4. Run the **mass extract** for that month → one commission PDF per Booking property (Votsala = one PDF).
 5. From each PDF, read the **Booking apartment id** (the only apartment key on the invoice).
-6. Look up `S.apts.bookingHotelId` → Elysian apartment name.
-7. File as `Booking.com/{M}/{elysian-name}/invoice-{bookingId}-{invoiceNo}.pdf`.
+6. Look up `S.apts.bookingHotelId`. If the apt has `clearGroup === 'Votsala'`, file under **`Votsala`**, not `Votsala 1`.
+7. File as `Booking.com/{M}/{elysian-name-or-Votsala}/invoice-{bookingId}-{invoiceNo}.pdf`.
 
 Phase 0 records the mass-extract control (button/filter/download), not login.
 
@@ -140,15 +144,15 @@ Three lists must be reconcilable for document month M:
 
 | List | Source | Role |
 |---|---|---|
-| **A. Expect** | Hosthub: unique apartments with BDC **reservations in M−1** (June → July invoice) | Apartments that should have **one** July PDF |
-| **B. Portal** | Group Invoices: one commission-invoice row per property for month M | What Booking issued |
-| **C. Vault** | `Booking.com/{M}/{apartment}/` — **one** PDF each | What we stored |
+| **A. Expect** | Hosthub: BDC billing units with reservations in M−1. Votsala 1–8 → **one** row | Units that should have **one** July PDF |
+| **B. Portal** | Mass extract: one commission PDF per Booking property | What Booking issued |
+| **C. Vault** | `Booking.com/{M}/{unit}/` — one PDF each (`Votsala` is one unit) | What we stored |
 
-Pull is **not done** when `C > 0`. It is done when every Expect apartment has **exactly one** PDF in the M folder, and extra portal rows are explained.
+Pull is **not done** when `C > 0`. It is done when every Expect **unit** has **exactly one** PDF in the M folder, and extra portal rows are explained.
 
 A **0-PDF** result is a failure, with the portal error text — same as Airbnb — unless the job itself reports “invoices not issued yet (before ~7th)”.
 
-Do not use “Hosthub booking count” as the PDF target. Ten June reservations at Birdhouse → **one** file in `Booking.com/2026-07/Birdhouse/`.
+Do not use “Hosthub booking count” as the PDF target. Ten June reservations at Birdhouse → **one** file in `Booking.com/2026-07/Birdhouse/`. June reservations across Votsala 1–8 → **one** file in `Booking.com/2026-07/Votsala/`.
 
 ---
 
@@ -156,13 +160,15 @@ Do not use “Hosthub booking count” as the PDF target. Ten June reservations 
 
 Invoices **do not name** the Elysian apartment. They only print the **Booking.com apartment / hotel id**. Fuzzy name matching cannot work.
 
-Add `bookingHotelId` on Configuration (`S.apts`), same class of per-apartment field as `aliases`. One id per unit that is listed on Booking.com.
+Add `bookingHotelId` on Configuration (`S.apts`), same class of per-apartment field as `aliases`. One id per **Booking.com property**.
+
+Votsala 1–8 share **one** Booking id (one property). Put that id on every Votsala row, or on one row and resolve via `clearGroup === 'Votsala'`. Lookup files under folder **`Votsala`**.
 
 Pull then:
 
 1. Parse Booking apartment id from the PDF (and from the mass-extract row if present).
 2. Look up `S.apts` where `bookingHotelId` equals that id.
-3. File under that apartment’s `name`.
+3. File under that apartment’s `name`, unless `clearGroup === 'Votsala'` → file under **`Votsala`**.
 4. If no row matches: store under `Booking.com/{M}/unmapped-{bookingId}/` and list it on Review as **needs mapping**. Completeness fails until it is mapped and refiled. Never guess a folder from the PDF text.
 
 Fill the map **once**:
@@ -192,11 +198,10 @@ All of this lands in `elysian-clearing` as follow-up PRs. This brain doc does no
 
 - Add `estimateBookingInvoices(month, bks)`:
   - Filter `platform` Booking.com
-  - Group by `aptId` (fallback `aptName`)
-  - Include apartment if it had **reservations in M−1** (June reservations → July expect)
-  - Keep guest-pays-at-property rows
-  - Return `{ apts, bookings, bookMonth }` — `apts.length` is the expected PDF count (**one per apartment**)
-- Un-hide the Booking expect list. Copy: “one invoice per apartment; June reservations → July folder”.
+  - Group by BDC billing unit: `clearGroup === 'Votsala'` → key `Votsala`; else `aptId` / `aptName`
+  - Include a unit if any of its apartments had **reservations in M−1**
+  - Return `{ apts, bookings, bookMonth }` — `apts.length` is the expected PDF count (**one per billing unit**)
+- Un-hide the Booking expect list. Copy: “one invoice per apartment; Votsala 1–8 = one BDC invoice; June reservations → July folder”.
 
 ### Collect UI
 
@@ -213,7 +218,7 @@ Replace `listBookingProperties` + `downloadBookingInvoicesForProperty` with mont
 1. Open group Finance → Invoices with the logged session
 2. Run **mass extract** for month M
 3. For each PDF: parse **Booking apartment id** (required)
-4. Map id → `S.apts` via `bookingHotelId`; unmapped → `unmapped-{id}`
+4. Map id → `S.apts` via `bookingHotelId`; if `clearGroup === 'Votsala'` file as **`Votsala`**; unmapped → `unmapped-{id}`
 5. Store via existing `piInvoiceStoreRel` as `Booking.com/{M}/{apt}/…`
 6. Emit `saved` / `progress` JSON like Airbnb so the job poller works
 7. Flag Expect apartments with 0 PDFs; flag **more than one** PDF in that month’s folder; flag unmapped ids
@@ -225,7 +230,7 @@ Replace `listBookingProperties` + `downloadBookingInvoicesForProperty` with mont
 
 ### Configuration
 
-- New optional field `bookingHotelId` on each apartment (Configuration tab). Empty = not listed on Booking, or not mapped yet.
+- New optional field `bookingHotelId` on each apartment (Configuration tab). Empty = not listed on Booking, or not mapped yet. Votsala 1–8 share one id.
 - Collect/Review shows unmapped Booking ids from the latest pull so they can be pasted onto the right apartment once.
 
 ### Backfill
@@ -270,11 +275,11 @@ Elysian pack **attaches the BDC PDFs**. No Booking.com Excel. Optional historica
 
 | Test | Asserts |
 |---|---|
-| `estimateBookingInvoices` | Two June reservations, same apt → **one** July expect row; apartment with no June reservations → not listed |
-| Fixture invoices page | Worker finds **one** PDF target per property; skips XLS/CSV |
+| `estimateBookingInvoices` | Two June reservations, same apt → **one** July expect row; Votsala 1 + Votsala 2 June BDC → **one** Votsala row; Airbnb Votsala stays stay per unit |
+| Fixture invoices page | Worker finds **one** PDF target per Booking property; skips XLS/CSV |
 | Parser | Booking apartment id + invoice number from a redacted text fixture |
-| Map | Known `bookingHotelId` → Elysian folder; unknown id → `unmapped-{id}`, never a name guess |
-| Vault path | July collect → `Booking.com/2026-07/Apt/invoice-….pdf` (June reservations stay in the July folder) |
+| Map | Known `bookingHotelId` → Elysian folder; Votsala id → folder `Votsala`; unknown id → `unmapped-{id}`, never a name guess |
+| Vault path | July collect → `Booking.com/2026-07/Apt/…`; Votsala → `Booking.com/2026-07/Votsala/…` |
 | Completeness helper | Missing Expect apartments flagged; **two PDFs in one apt/month folder** flagged; unmapped ids fail the month; 0 PDF is failure unless `tooEarly` |
 | Excel | `buildAccountantXls` still **skips** Booking.com (permanent) |
 
@@ -317,6 +322,7 @@ Confirmed 16 Aug 2026:
 2. **No Excel for Booking.com.** Ship PDFs only.
 3. **Finance session is logged.** Mass extract of all apartments per month is the pull.
 4. Invoices carry **Booking apartment id only** — Configuration needs `bookingHotelId`.
+5. **Votsala 1–8 = one BDC invoice** (same as payouts). Airbnb remains per apartment. No other clearing group is billed this way.
 
 Still needed:
 
