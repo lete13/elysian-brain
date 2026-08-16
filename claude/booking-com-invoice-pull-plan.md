@@ -1,8 +1,15 @@
 # Booking.com invoice pull — plan
 
-State as of **16 Aug 2026**. Unparks the Booking.com half of Platform Invoices after the Airbnb Hosthub-code pull went live (15 Aug). Aligns with `claude/platform-invoices-feature.md` and the Invoices Accounting Process SOP (no individual names).
+State as of **16 Aug 2026** (Lefteris confirmed: **one invoice per apartment**; June reservations → **one July PDF**; **no BDC Excel**). Unparks the Booking.com half of Platform Invoices after the Airbnb Hosthub-code pull went live (15 Aug). Aligns with `claude/platform-invoices-feature.md` and the Invoices Accounting Process SOP (no individual names).
 
 **This is the plan, not the live worker.** Do not treat the existing `pullBooking()` heuristics as proven. Airbnb already showed that guessed extranet URLs and “click Download” save 0 useful files.
+
+**Confirmed 16 Aug 2026:**
+
+- Booking.com generates **a single invoice per apartment**.
+- All **June reservations** are on that **one July invoice**.
+- The **July** BDC folder holds **one PDF** (June reservations inside it) — never one PDF per reservation, never file it under June.
+- **No Excel** for Booking.com. Ship the PDFs only.
 
 ---
 
@@ -14,9 +21,9 @@ Automatically collect **every Booking.com host-portal invoice PDF** that Elysian
 
 | Slice | Meaning |
 |---|---|
-| **Going forward** | Every monthly commission invoice (and related credit/debit notes) as soon as Booking issues them |
-| **Completeness** | Every **property** Booking billed that month — not one PDF per reservation |
-| **Document types** | Legal PDFs: commission invoices, credit notes, debit notes. **Not** reservation-statement XLS/CSV |
+| **Going forward** | Every monthly commission invoice as soon as Booking issues them |
+| **Completeness** | **Exactly one PDF per apartment** in that month’s Booking.com folder — not one PDF per reservation |
+| **Document types** | The commission **invoice PDF** only. **Not** reservation-statement XLS/CSV, **not** an accountant Excel |
 | **Backfill** | One historical pass from the Extranet archive (Booking keeps ~5 years behind “Filter by year”) |
 | **Who gets them** | Pull the whole portfolio; **Ship** still splits Elysian-tax (leased) vs B2B partner packs. Private owners get none |
 
@@ -34,8 +41,8 @@ In `lete13/elysian-clearing`:
 | `POST /api/platform-invoices/pull` with `channel=booking` | Live API; Collect UI currently sends **Airbnb only** |
 | Session vault `pi_portal_session_booking` | Live (`Connect` / `BOOKING_STORAGE_STATE_B64` / `BOOKING_HOST_*`) |
 | Worker `scripts/platform-invoice-pull.js` → `pullBooking()` | **Parked heuristic** — guessed Finance URLs, first-PDF-per-property, name fuzzy-match |
-| Expect | Unique apartments with Booking.com bookings **created in M−1** (booking count is context only) |
-| Accountant Excel | **Skips Booking.com rows** on purpose (`platform-invoice-accountant-xls.js`) |
+| Expect | Unique apartments with June BDC **reservations** → one July invoice each (booking count is context only) |
+| Accountant Excel | **Airbnb only.** Confirmed: **no Excel for Booking.com** — Ship attaches the PDFs |
 | Collect UI | Booking checklist hidden; copy says pull is parked |
 
 Env already named: `BOOKING_HOST_EMAIL` / `BOOKING_HOST_PASSWORD` (admin.booking.com **Login name**, not www.booking.com), optional `BOOKING_STORAGE_STATE_B64`. Prefer **Connect Booking** in the app.
@@ -57,48 +64,41 @@ Invoices are also emailed to the primary address and the Extranet Inbox. Email i
 
 ---
 
-## Document model (must get this right before coding)
+## Document model (confirmed 16 Aug 2026)
 
-### One legal invoice per property, not per booking
+### One invoice per apartment — June reservations live in the July folder
 
-Booking.com does **not** issue one combined invoice for the group. Each property gets its own commission invoice. Group Extranet can **list and download** them together, filtered by checkout month.
+Booking.com summarises **all of an apartment’s June reservations into a single invoice issued in July**. The vault matches that:
 
-That matches the SOP: **one invoice per apartment**.
-
-### Dating — checkout month, not Hosthub `created`
-
-Partner Help (current): *“In the first week of every month, you’ll receive your commission invoice which covers all guest **check-outs** from the previous month.”*
-
-SOP language (“June stays → July invoice”, “month after the bookings”) is the **checkout / stay** month, not the booking-created month.
-
-| Document month **M** (the month we Collect) | Covers |
+| Folder | Contents |
 |---|---|
-| e.g. **2026-08** | Booking.com check-outs in **2026-07** |
+| `Booking.com/2026-07/{apartment}/` | **Exactly one** invoice PDF. That PDF lists the apartment’s **June** reservations |
+| `Booking.com/2026-08/{apartment}/` | **Exactly one** invoice PDF. That PDF lists the apartment’s **July** reservations |
 
-**Current Expect is wrong for this channel:** it counts apartments with Booking.com bookings **created** in M−1. Advance reservations created in May that check out in July belong on the **August** invoice, not June’s.
+Not one PDF per reservation. Not several July files for the same apartment. Ten June reservations at Birdhouse → **one** file under `Booking.com/2026-07/Birdhouse/`.
 
-**Working rule until a live PDF contradicts it:**
+Booking.com does **not** issue one combined invoice for the whole group. Each property gets its own PDF. Group Extranet can **list and download** them together.
 
-- **Which apartments to expect for month M** = unique apartments with Booking.com **check-out** in M−1 (active / commission-bearing). Cancelled-with-fee and guest-pays-at-property still produce a monthly commission line — keep them in Expect.
-- **Which folder a PDF is archived in** = **invoice issue date** printed on the PDF when present; otherwise Collect month M. (Unlike Airbnb extends, BDC monthly invoices almost always issue in M for check-outs M−1.)
-- **Do not** refile Booking.com PDFs using Hosthub `created`. The Airbnb `plannedRefile` already leaves `channel=booking` on the collect month; keep that until a live issue-date parser exists.
+### Dating
+
+| Collect / folder month **M** | What the one PDF contains |
+|---|---|
+| **July** (`2026-07`) | All **June** reservations for that apartment |
+| **August** (`2026-08`) | All **July** reservations for that apartment |
+
+- **Expect for July** = unique apartments that had Booking.com **reservations in June**. Booking count is context only (`N reservations → 1 PDF`).
+- **Archive month** = the invoice month (July folder), not Hosthub `created` on each stay, and not Airbnb-style per-document issue-date refile.
+- Do **not** refile a Booking.com PDF into June because the reservations were in June.
 
 **Availability window:** invoices appear in the **first week of M**. A pull on the 1st–2nd can honestly return 0 — that is “too early”, not “portal broken”. Retry after the 7th if the group list is still empty. Start ASAP once documents exist; do not wait for the 20th/25th.
 
-### Other PDFs on the same Finance page
+### What we store vs skip
 
-Keep:
+Keep: the monthly **commission invoice PDF** (the ενδοκοινοτικά document). One per apartment per folder month.
 
-- Commission invoice (the ενδοκοινοτικά document accountants need)
-- Credit notes / debit notes (corrections; issued throughout the month)
+Skip: reservation-statement XLS/CSV, Finance overview CSV, Statement of Accounts, and **any Booking.com Excel** for accountants (confirmed: PDFs only).
 
-Skip (do not vault as invoices):
-
-- Reservation statement XLS/CSV
-- Finance overview CSV
-- Statement of Accounts (portfolio summary — useful later, not the per-apartment invoice)
-
-Guest-pays-at-property units (the Art House / Joël pattern) still get a **monthly** commission invoice even when Hosthub shows no per-booking fees. Expect must not drop those apartments.
+Guest-pays-at-property units still get that **one monthly invoice** even when Hosthub shows no per-booking fees. Expect must not drop those apartments.
 
 ---
 
@@ -114,12 +114,12 @@ If the host login lands on the **group Extranet** (likely with this portfolio):
 
 1. `admin.booking.com` → group home
 2. **Finance → Invoices**
-3. Filter by **checkout month** = M−1 (or issue month M — confirm on the live page)
-4. For each row that is a commission / credit / debit **PDF**: download
+3. Filter so we get the invoices **issued in month M** (July invoices = June reservations). Confirm the Extranet control in Phase 0 — it may be labelled issue month or reservation month.
+4. Download **one commission invoice PDF per apartment**
 5. Parse property id + invoice number + issue date + amount from the PDF (or the table row)
-6. File under the matched apartment
+6. File under `Booking.com/{M}/{apartment}/` — July folder for the June-reservations invoice
 
-Partner Help: *“View all invoices in your group Extranet under Finance. Download invoices … filtered by the checkout month.”*
+Partner Help mentions filtering group downloads by checkout month — treat that as Extranet UI labelling. The filing rule is Lefteris’s: **July folder = one invoice of June reservations.**
 
 This is the only path that can pull **all** properties in one job without walking 50+ property homepages.
 
@@ -149,7 +149,7 @@ In order of preference, once network traffic is visible:
 
 Never PDF a Finance shell, login wall, or reservation-statement HTML.
 
-Current worker stops after the **first** PDF per property and ignores credit notes. The real job must take **every** commission/credit/debit PDF for that month.
+Current worker stops after the first PDF per property — that part of the heuristic matches the **one invoice** rule. What it does **not** do is land on the real Invoices page or file into `Booking.com/2026-07/{apt}/` with June reservations. Phase 0 still has to record the real URL.
 
 ---
 
@@ -159,15 +159,15 @@ Three lists must be reconcilable for document month M:
 
 | List | Source | Role |
 |---|---|---|
-| **A. Expect** | Hosthub: unique apartments with BDC **check-out** in M−1 (plus guest-pays-at-property / cancelled-with-fee) | What we *think* Booking billed |
-| **B. Portal** | Group Invoices table row count for that filter | What Booking *says* it issued |
-| **C. Vault** | `platform_invoices` where `channel=booking` and archive month = M | What we *stored* |
+| **A. Expect** | Hosthub: unique apartments with BDC **reservations in M−1** (June → July invoice) | Apartments that should have **one** July PDF |
+| **B. Portal** | Group Invoices: one commission-invoice row per property for month M | What Booking issued |
+| **C. Vault** | `Booking.com/{M}/{apartment}/` — **one** PDF each | What we stored |
 
-Pull is **not done** when `C > 0`. It is done when **C covers B**, and every A apartment is either in C or explicitly explained (no checkout commission, listing not on Booking, too early in the month).
+Pull is **not done** when `C > 0`. It is done when every Expect apartment has **exactly one** PDF in the M folder, and extra portal rows are explained.
 
 A **0-PDF** result is a failure, with the portal error text — same as Airbnb — unless the job itself reports “invoices not issued yet (before ~7th)”.
 
-Do not use “Hosthub booking count” as the PDF target. Ten July checkouts at Birdhouse → **one** August invoice.
+Do not use “Hosthub booking count” as the PDF target. Ten June reservations at Birdhouse → **one** file in `Booking.com/2026-07/Birdhouse/`.
 
 ---
 
@@ -184,7 +184,7 @@ Plan:
 3. Hosthub rental payloads may already carry a Booking listing id — check during implementation; do not assume they do (sync today maps `reservation_id` but not a hotel id onto apartments).
 4. Name match stays a last-resort hint, never the only key.
 
-Filenames: `Booking.com/{month}/{apartment}/invoice-{hotelId}-{invoiceNo}.pdf` (credit notes use `credit_note-…`).
+Filenames: `Booking.com/{month}/{apartment}/invoice-{hotelId}-{invoiceNo}.pdf`. One file per apartment per month.
 
 ---
 
@@ -211,10 +211,10 @@ All of this lands in `elysian-clearing` as follow-up PRs. This brain doc does no
 - Add `estimateBookingInvoices(month, bks)`:
   - Filter `platform` Booking.com
   - Group by `aptId` (fallback `aptName`)
-  - Include apartment if any **check-out** date falls in M−1
-  - Keep guest-pays-at-property and cancelled-with-fee rows
-  - Return `{ apts, bookings, bookMonth }` — `apts.length` is the expected PDF **floor** (portal may add credit notes)
-- Un-hide the Booking expect list. Copy: “one invoice per apartment; checkout month M−1 → document month M”.
+  - Include apartment if it had **reservations in M−1** (June reservations → July expect)
+  - Keep guest-pays-at-property rows
+  - Return `{ apts, bookings, bookMonth }` — `apts.length` is the expected PDF count (**one per apartment**)
+- Un-hide the Booking expect list. Copy: “one invoice per apartment; June reservations → July folder”.
 
 ### Collect UI
 
@@ -230,16 +230,16 @@ Replace `listBookingProperties` + `downloadBookingInvoicesForProperty` with a pa
 
 1. Open group Finance → Invoices (preferred) or per-`hotel_id` fallback
 2. Apply month filter
-3. Download every commission/credit/debit PDF
+3. Download **one** commission invoice PDF per apartment (the June-reservations invoice into the July folder)
 4. Parse meta; map `hotel_id` → apartment
-5. Store via existing `piInvoiceStoreRel`
+5. Store via existing `piInvoiceStoreRel` as `Booking.com/{M}/{apt}/…`
 6. Emit `saved` / `progress` JSON like Airbnb so the job poller works
-7. If portal rows > saved PDFs, push per-row errors (do not swallow)
+7. Flag Expect apartments with 0 PDFs; flag apartments with **more than one** PDF in that month’s folder
 
-### Parser + Excel
+### Parser (no Excel)
 
-- Parse invoice number, issue date, total, sign, hotel id from PDF text (pdftotext or existing HTML-print path)
-- Decide with Lefteris whether Ship Excel grows a **Booking.com sheet** (accountants currently get Airbnb `Airbnb-VAT-YYYY-MM.xls` only). Until then, Ship still **attaches the PDFs**.
+- Parse invoice number, issue date, total, hotel id from PDF text (for Review chips and completeness).
+- **Do not** add a Booking.com sheet to `Airbnb-VAT-YYYY-MM.xls`. Confirmed: accountants get BDC **PDFs only**. The existing Excel skip for `channel=booking` stays.
 
 ### Backfill
 
@@ -258,23 +258,24 @@ Record:
 1. Group vs single-property landing page
 2. Exact Invoices URL(s) and the month-filter control
 3. Network: PDF hrefs vs blob vs HTML viewer
-4. How many PDFs per property (commission only vs + credit notes)
+4. Confirm one PDF per property (not per reservation)
 5. Where `hotel_id` / property name / invoice number appear
 6. Whether “too early” has a distinct empty state
+7. That the July invoice’s reservation list is June reservations
 
 Output: a short addendum in this file (URLs, selectors, one redacted example row) plus 1–2 fixture HTML/PDF snippets in clearing `tests/` (no live credentials).
 
 ### Phase 1 — Test pull (2 apartments, one month)
 
-Worker + Collect **Test pull**. Success = two real commission PDFs in the vault, tagged to the right apartments, invoice numbers visible. Same bar as Airbnb’s `HM9DCDMEXT` / `HMWRNAWHBA` proof.
+Worker + Collect **Test pull**. Success = **two** apartments, **one** July invoice PDF each, filed under `Booking.com/2026-07/{apt}/`, reservation list is June. Same bar as Airbnb’s two-code proof.
 
 ### Phase 2 — Full month vs Expect
 
-Pull all properties for that month. Completeness: vault apartments ⊇ Expect, and portal row count = saved PDFs (or explained misses). Then un-hide Collect **Pull Booking.com**.
+Pull all properties for that month. Completeness: each Expect apartment has **exactly one** PDF in the July folder. Then un-hide Collect **Pull Booking.com**.
 
 ### Phase 3 — Ship + backfill
 
-Elysian pack includes BDC PDFs (Excel sheet if accountants want it). Optional historical backfill. Monthly cadence: run as soon as the first-week invoices exist.
+Elysian pack **attaches the BDC PDFs**. No Booking.com Excel. Optional historical backfill. Monthly cadence: run as soon as the first-week invoices exist.
 
 ---
 
@@ -282,12 +283,12 @@ Elysian pack includes BDC PDFs (Excel sheet if accountants want it). Optional hi
 
 | Test | Asserts |
 |---|---|
-| `estimateBookingInvoices` | Checkout in M−1 → apartment listed; created-only in M−1 with later checkout → **not** listed; two bookings same apt → one expect row |
-| Fixture invoices page | Worker finds N PDF targets from recorded HTML; skips XLS/CSV |
+| `estimateBookingInvoices` | Two June reservations, same apt → **one** July expect row; apartment with no June reservations → not listed |
+| Fixture invoices page | Worker finds **one** PDF target per property; skips XLS/CSV |
 | Parser | Invoice number, issue date, total, hotel id from a redacted text fixture |
-| Vault path | `piInvoiceStoreRel` for booking stays `Booking.com/YYYY-MM/Apt/…` |
-| Completeness helper | Missing Expect apartments flagged; 0 PDF is failure unless `tooEarly` |
-| Excel | Still skips BDC until a Booking sheet is explicitly added |
+| Vault path | July collect → `Booking.com/2026-07/Apt/invoice-….pdf` (June reservations stay in the July folder) |
+| Completeness helper | Missing Expect apartments flagged; **two PDFs in one apt/month folder** flagged; 0 PDF is failure unless `tooEarly` |
+| Excel | `buildAccountantXls` still **skips** Booking.com (permanent) |
 
 No live `admin.booking.com` in CI. Live proof is a Collect job id, like Airbnb `ppmsuw193wm05or`.
 
@@ -300,9 +301,9 @@ No live `admin.booking.com` in CI. Live proof is a Collect job id, like Airbnb `
 | Captcha / 2FA on Railway | Connect once; session vault; proxy env if needed |
 | Extranet UI churn | Prefer fetch of recorded PDF URLs over brittle clicks |
 | Pull on the 1st–6th | Explicit too-early error; retry after the 7th |
-| Wrong Expect (created vs checkout) | Fix Expect in the same PR as the worker |
+| Two PDFs in one July folder | Completeness fails; keep the commission invoice, drop statements |
 | Mis-filed apartments | `hotel_id` mapping; name match last |
-| Credit notes missed | Download all PDF rows, not first-per-property |
+| June PDF filed under June | Archive month is the **invoice** month (July) |
 | In-memory pull jobs die on deploy | Same Airbnb limitation; Stop + resume by month+channel |
 | Public clearing repo | No credentials, no ΑΦΜ, no live invoice dumps in git |
 
@@ -315,15 +316,21 @@ No live `admin.booking.com` in CI. Live proof is a Collect job id, like Airbnb `
 - Oxygen documents
 - Combining many properties into one PDF (Booking does not issue that)
 - Treating reservation statements as the accountant pack
+- A Booking.com accountant Excel / extra sheet on `Airbnb-VAT-YYYY-MM.xls`
 
 ---
 
 ## Lefteris gates (before Phase 1 is “done”)
 
-1. Confirm Expect uses **checkout month** (this plan’s default) vs created month
-2. Connect a Finance-capable Booking session
-3. Confirm whether Ship Excel needs a Booking.com sheet or PDFs-only is enough
-4. Pick the first live test month (one that already has invoices on the Extranet)
+Confirmed 16 Aug 2026:
+
+1. **One invoice per apartment.** July BDC folder = one PDF whose reservations are June’s.
+2. **No Excel for Booking.com.** Ship PDFs only.
+
+Still needed:
+
+1. Connect a Finance-capable Booking session
+2. Pick the first live test month (one that already has invoices on the Extranet)
 
 ---
 

@@ -25,10 +25,11 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 ## How each channel dates documents (critical)
 
 ### Booking.com
-- Summarises reservations and cuts **one invoice per apartment** the **month after** the stays.
-- Example: all **June** check-outs for apartment X → **one** July invoice for apartment X (not one PDF per booking). Booking.com Partner Help: invoices go out in the **first week of M** and cover **check-outs in M−1**.
-- Hosthub expect for document month **M** should list **unique apartments** with Booking.com **check-outs in M−1** (active / commission-bearing). Booking count is context only. Today’s UI still uses **created in M−1** — that is a known bug to fix when the pull is unparked.
-- Pull remains **parked** until the plan in `claude/booking-com-invoice-pull-plan.md` is executed (group Finance list, not the guessed per-property URLs). Manual fallback: admin.booking.com → Finance → Invoices.
+- **One invoice per apartment.** All of an apartment’s **June reservations** are billed on a **single July invoice**.
+- Vault: `Booking.com/2026-07/{apartment}/` holds **exactly one** PDF — that PDF’s reservation list is June. Do not file one PDF per booking, and do not put the June invoice under the June folder.
+- Hosthub expect for document month **July** = unique apartments with Booking.com **reservations in June**. Booking count is context only (`N reservations → 1 PDF`).
+- **No Excel** for Booking.com. Ship the PDFs only (`Airbnb-VAT-YYYY-MM.xls` stays Airbnb).
+- Pull remains **parked** until `claude/booking-com-invoice-pull-plan.md` is executed. Manual fallback: admin.booking.com → Finance → Invoices.
 
 ### Airbnb — two different date jobs
 
@@ -101,9 +102,9 @@ Booking.com pull (admin.booking.com, one invoice per apartment, month-after dati
 Manual fallback if needed:
 
 1. admin.booking.com → Finance → Invoices (prefer **group** Extranet so every property is on one list)
-2. Filter by checkout month → download each commission / credit / debit **PDF** (not reservation-statement XLS)
-3. File under apartment / month / Booking
-4. Remember: invoice month **M** = month after the **check-out** month; documents appear in the first week of M
+2. Take the **July** commission invoice PDF for each apartment (it lists **June** reservations)
+3. File **one PDF** under `Booking.com/2026-07/{apartment}/`
+4. No Booking.com Excel — PDFs only
 
 ---
 
@@ -111,12 +112,12 @@ Manual fallback if needed:
 
 | Group | Delivery | Recipients |
 |---|---|---|
-| **Elysian’s own units** | Notification + internal folders + accountant Excel | `info@e-newgeneration.gr` and `info@elysianproperties.eu` |
+| **Elysian’s own units** | Notification + internal folders + Airbnb Excel + Booking.com PDFs | `info@e-newgeneration.gr` and `info@elysianproperties.eu` |
 | **External / partner groups** | Email attachments + internal folders | That group’s accountant / owner emails (private process table / Configuration) |
 
 When Elysian’s own packs for month X are filed, send one completion notification (subject like `PLATFORM INVOICES MONTH/YEAR`).
 
-Ship email attaches the PDFs **plus** `Airbnb-VAT-YYYY-MM.xls`: Ημερομηνία = issue date, Αιτιολογία = invoice number (`AIUC-…`), Ποσό = total €, Πρόσημο ποσού = empty if positive / `-` if credit. Extra columns: reservation id, listing name, check-in, check-out.
+Ship email attaches the PDFs **plus**, for Airbnb only, `Airbnb-VAT-YYYY-MM.xls`: Ημερομηνία = issue date, Αιτιολογία = invoice number (`AIUC-…`), Ποσό = total €, Πρόσημο ποσού = empty if positive / `-` if credit. Extra columns: reservation id, listing name, check-in, check-out. **Booking.com: PDFs only — no Excel.**
 
 ---
 
@@ -128,7 +129,7 @@ Primary nav tab for Accounting and Admin (sidebar icon as of 15 Aug 2026). Guide
 2. **Expect** — which Hosthub stays to open **and** estimated invoice count (not “PDF count = stay count”)
 3. **Collect** — **Test pull** (the two codes above) · **Pull Airbnb (Hosthub codes)** · **Stop pull** · Connect Airbnb if the session expired · upload is emergency-only
 4. **Review** — vault by apartment; **Open** serves the PDF
-5. **Ship** — email finished Elysian pack + Excel to accountants
+5. **Ship** — email finished Elysian pack (Airbnb PDFs + Excel; Booking.com PDFs only)
 
 A **0 PDF** pull is a failure with portal error text — **Connect** Airbnb and confirm Hosthub codes, then Pull again (do not treat monthly PDF upload as the process).
 
