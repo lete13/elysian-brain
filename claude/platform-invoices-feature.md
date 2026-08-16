@@ -26,9 +26,9 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 
 ### Booking.com
 - Summarises reservations and cuts **one invoice per apartment** the **month after** the stays.
-- Example: all **June** bookings for apartment X → **one** July invoice for apartment X (not one PDF per booking).
-- Hosthub expect for document month **M** lists **unique apartments** with Booking.com bookings **created in M−1** (active). Booking count is shown only as context.
-- Pull remains **parked** while Airbnb Hosthub-code pull is the focus. Manual fallback: admin.booking.com → Finance → Invoices.
+- Example: all **June** check-outs for apartment X → **one** July invoice for apartment X (not one PDF per booking). Booking.com Partner Help: invoices go out in the **first week of M** and cover **check-outs in M−1**.
+- Hosthub expect for document month **M** should list **unique apartments** with Booking.com **check-outs in M−1** (active / commission-bearing). Booking count is context only. Today’s UI still uses **created in M−1** — that is a known bug to fix when the pull is unparked.
+- Pull remains **parked** until the plan in `claude/booking-com-invoice-pull-plan.md` is executed (group Finance list, not the guessed per-property URLs). Manual fallback: admin.booking.com → Finance → Invoices.
 
 ### Airbnb — two different date jobs
 
@@ -94,14 +94,16 @@ No manual pasting of codes. Re-sync Hosthub if Expect shows “missing code”.
 
 Both are Airbnb Ireland UC reverse-charge invoices to Elysian. Vault `total` on those two rows was stored as **0** (parser matched VAT rate `0.0%`); parser on `main` now takes **Subtotal €**. Folder `Requests` is the stay-page heading when Hosthub apt name was not posted with the test pull.
 
-### Booking.com (parked for now)
+### Booking.com (parked — unpark plan ready)
 
-Booking.com pull (admin.booking.com, one invoice per apartment, month-after dating) remains in the worker but is **not** the Collect focus. Manual fallback if needed:
+Booking.com pull (admin.booking.com, one invoice per apartment, month-after dating) remains in the worker but is **not** the Collect focus. The parked `pullBooking()` guesses Finance URLs and stops after the first PDF per property — **do not treat that as the design**. Plan: `claude/booking-com-invoice-pull-plan.md`.
 
-1. admin.booking.com → Finance → Invoices
-2. Select month → download outstanding documents
+Manual fallback if needed:
+
+1. admin.booking.com → Finance → Invoices (prefer **group** Extranet so every property is on one list)
+2. Filter by checkout month → download each commission / credit / debit **PDF** (not reservation-statement XLS)
 3. File under apartment / month / Booking
-4. Remember: invoice month = month after the bookings month
+4. Remember: invoice month **M** = month after the **check-out** month; documents appear in the first week of M
 
 ---
 
@@ -144,4 +146,5 @@ A **0 PDF** pull is a failure with portal error text — **Connect** Airbnb and 
 ## Related
 - Oxygen: `claude/monthly-close-and-oxygen.md`
 - Old checklist line `ota_inv`: `claude/monthly-tasks-feature.md`
+- Booking.com unpark plan: `claude/booking-com-invoice-pull-plan.md`
 - Clearing worker: `scripts/platform-invoice-pull.md` in `lete13/elysian-clearing`
