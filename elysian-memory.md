@@ -1,6 +1,6 @@
 # Elysian — Master Memory Document
 
-**v1.4 · 15 Aug 2026 · maintained by Lefteris + Claude**
+**v1.5 · 20 Aug 2026 · maintained by Lefteris + Claude**
 
 Purpose: the single source of truth about Elysian for any Claude session. Keep this in the Claude project (suggested path `claude/elysian-memory.md`), alongside the feature docs.
 
@@ -85,18 +85,18 @@ Catalogue: **Software**, **Business Tax**, and **utilities — electricity / int
 **Top bar (10):** Dashboard (`dash`) · Bookings (`bk`) · Expenses (`exp`) · Configuration (`cfg`) · Reports (`rpt`) · Annual Tracker (`ann`) · 📋 Monthly Tasks (`mt`) · 💰 Elysian Revenue (`rev`) · 🗓 Daily Ops (`ops`) · 📊 Performance (`perf`)
 **🧰 Tools dropdown (4):** Checkout Tracker (`co`) · Hosthub API (`hhapi`) · Imports incl. Run Tests (`imports`) · 💳 Payments Check (`pay`)
 
-**Accounting / Admin (15 Aug 2026):** **Platform Invoices** is a **primary tab** (sidebar icon) — not only a Tools item. **Property Info** is reachable from the Admin sidebar. **Personnel** is Admin-only (operators may open it). Daily Ops Beta UI is the operator-facing `/daily-ops` (Admin).
+**Accounting / Admin (15 Aug 2026):** **Platform Invoices** is a **primary tab** (sidebar icon) — not only a Tools item. **Property Info** is reachable from the Admin sidebar. **Personnel** is Admin-only (operators may open it). Daily Ops Beta UI is the operator-facing `/daily-ops` (Admin). **Keys Hubs** (`keys`, 20 Aug 2026) is a primary tab for operators + Admin — where backup keys live and which stored key is nearest. Doc: `claude/keys-hubs-feature.md`.
 
 Key behaviours: Reports has **report locking** (`rptLocks`) with the intentional **amber drift banner** when locked figures later change; report delivery: **📧 Email report to owner** (v12, 4–5 Aug 2026) — real PDF attachment, bilingual compose modal with embedded page-1 preview, sent via `/api/email/send`; sent-record in `S.rptLocks[key].email`; manual PDF download still available (see `claude/email-report-feature.md`). Report language per apartment (`language`).
 
 ### Server API surface (from code)
-`GET/POST /api/db/data` (shared-state pipeline) · `GET /api/db/status` · `POST /api/sync`, `/api/sync-cancelled` · `GET /api/discover`, `/api/history`, `/api/auto-sync-status`, `/api/server-config` · `GET/POST /api/session` (auth) · `POST /api/login` · `GET /api/me` · `/api/logout` · proofs: `POST/GET/DELETE /api/proofs`, `GET /api/proofs/:id` (table `proof_files`, auto-created) · Viva: `GET /api/viva/status`, `GET /api/viva/probe`, `POST /api/viva/check-now` (90 s cap) · email: `GET /api/email/status`, `POST /api/email/send`, `GET /api/email/probe` (diagnostics) · fe: `GET /api/fe-info` (auth-exempt release check) · Oxygen diag: `GET /api/oxygen/status`, `GET /api/oxygen/test-issue` (**sandbox-only**, PR #5) · Platform Invoices: `/api/platform-invoices`, `/api/platform-invoices/collect`, `/api/platform-invoices/expect`, `POST /api/platform-invoices/pull`, `GET /api/platform-invoices/pull/:id`, `POST /api/platform-invoices/pull-stop`, `GET /api/platform-invoices/:id/file`, `/api/platform-invoices/ship`. Pull jobs live **in memory** on the worker (lost on restart). Same month+channel POST **resumes** a running job. · `GET /health` · debug: `POST /api/debug-cancelled`, `/api/debug-checkin`. **Server-side anti-wipe** protects `monthlyTasks` and `payChk`.
+`GET/POST /api/db/data` (shared-state pipeline) · `GET /api/db/status` · `POST /api/sync`, `/api/sync-cancelled` · `GET /api/discover`, `/api/history`, `/api/auto-sync-status`, `/api/server-config` · `GET/POST /api/session` (auth) · `POST /api/login` · `GET /api/me` · `/api/logout` · proofs: `POST/GET/DELETE /api/proofs`, `GET /api/proofs/:id` (table `proof_files`, auto-created) · Viva: `GET /api/viva/status`, `GET /api/viva/probe`, `POST /api/viva/check-now` (90 s cap) · email: `GET /api/email/status`, `POST /api/email/send`, `GET /api/email/probe` (diagnostics) · fe: `GET /api/fe-info` (auth-exempt release check) · Oxygen diag: `GET /api/oxygen/status`, `GET /api/oxygen/test-issue` (**sandbox-only**, PR #5) · Platform Invoices: `/api/platform-invoices`, `/api/platform-invoices/collect`, `/api/platform-invoices/expect`, `POST /api/platform-invoices/pull`, `GET /api/platform-invoices/pull/:id`, `POST /api/platform-invoices/pull-stop`, `GET /api/platform-invoices/:id/file`, `/api/platform-invoices/ship`. Pull jobs live **in memory** on the worker (lost on restart). Same month+channel POST **resumes** a running job. · `GET /health` · debug: `POST /api/debug-cancelled`, `/api/debug-checkin`. **Server-side anti-wipe** protects `monthlyTasks`, `payChk`, and Keys Hubs maps (`keyHubs` / `keyLabels` / `keyLockbox`).
 
 ### Railway env (names from code)
 `APP_PASSWORD` (fallback) · `USERS_JSON` (**set on Railway**, 15 Aug 2026) · `AUTO_SYNC_HOUR` · `HOSTHUB_API_KEY` · `DATABASE_URL` / `DATABASE_PRIVATE_URL` / `POSTGRES_URL` / `POSTGRES_PRIVATE_URL` / `PG*` family · `PORT` · `VIVA_TX_USER` · `VIVA_TX_PASS` · `VIVA_ENV` · `VIVA_BASE_URL` · `VIVA_ACCOUNTS_URL` · email: `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` + `EMAIL_FROM` / `EMAIL_REPLY_TO` / `EMAIL_BCC` (⚠ **Railway firewalls all outbound SMTP below the Pro plan** — plan upgraded to Pro 5 Aug 2026; new network rules apply only to fresh deploys, so redeploy once after any plan change) · Oxygen: `OXYGEN_API_KEY` (sandbox key set 5 Aug) / `OXYGEN_API_BASE` (defaults to sandbox in code) · Platform Invoices: `AIRBNB_HOST_EMAIL` / `AIRBNB_HOST_PASSWORD` · optional `AIRBNB_STORAGE_STATE_B64` · `PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `BOOKING_HOST_*` (pull parked). **Postgres backup status: unverified** (Railway navigation was declined in-browser) — open loop: check Railway → Postgres service → Backups; if absent, enable or schedule `pg_dump`.
 
 ### Global `S` object (primary data interface in the browser)
-`S.apts` · `S.bks` · `S.revenue.mgmt` / `S.revenue.cleaning` · `S.payChk` (+ `payChk.bank.lastResult`) · `monthlyTasks` / `monthlyTaskDefs` · `rptLocks`.
+`S.apts` · `S.bks` · `S.revenue.mgmt` / `S.revenue.cleaning` · `S.payChk` (+ `payChk.bank.lastResult`) · `monthlyTasks` / `monthlyTaskDefs` · `rptLocks` · `S.keyHubs` / `S.keyLabels` / `S.keyLockbox` (Keys Hubs).
 
 ---
 
@@ -284,7 +284,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked) · `claude/keys-hubs-feature.md` (20 Aug 2026)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
@@ -311,6 +311,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **v1.5 (20 Aug 2026)** — **Keys Hubs** tab: backup-key locations (Votsala / Verandas / Cholargos / Thessaloniki / Driver + on-site lockbox), nearest stored key, shared-state persist + server anti-wipe. Operators + Admin. Doc: `claude/keys-hubs-feature.md`. Source: Lefteris `index_1.html` draft, 20 Aug 2026.
 - **v1.4 (15 Aug 2026)** — Platform Invoices Airbnb pull **live** (new-tab `www.airbnb.gr` capture; archive by **VAT issue date**, not Hosthub `created`/`cancelledAt`; Hosthub codes; Excel ship). Two-code test saved real AIUC PDFs (job `ppmsuw193wm05or`). Booking.com parked. `USERS_JSON` confirmed on Railway. Platform Invoices is a primary Accounting/Admin tab. Daily Ops Beta UI and Personnel remain as of 8 Aug. Doc: `claude/platform-invoices-feature.md`. Source: live Collect 15 Aug 2026; Lefteris dating rule; clearing `main` `db13617` / `5eff0da`.
 - **13 Aug 2026** — Platform invoices: **Airbnb = Hosthub `reservationId` → confirmation-code pull** (VAT Invoicer-style); Booking.com pull parked for now. Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices: **pull-first automation** (DB portal sessions, multi-property Booking pull, upload emergency-only). Doc: `claude/platform-invoices-feature.md`.
