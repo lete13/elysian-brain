@@ -4,6 +4,7 @@ New tab in the Elysian Clearing app (🧰 Tools dropdown → 💳 Payments Check
 
 ## Payment rules implemented
 - **Booking.com** — `payout(Thursday T) = Σ reservations with checkout ∈ [T−7, T−1]`, i.e. every checkout is paid on the **first Thursday strictly after it** (Wed checkout → next-day Thu; Thu checkout → +7 days). One bank credit **per property per Thursday** (per Lefteris's account setup). Expected amount = **gross − commission − payment charges** (Hosthub "Total Payout"), minus any channel-remitted taxes (`trChan`). *Rule validated against a real Booking.com payout statement (Birdhouse, Thu 23 Jul 2026, window 16–22 Jul).*
+- **Clearing groups (21 Aug 2026):** `clearGroup` on Configuration is for **owner reports**. Payments Check / Viva **only** collapse **Votsala** (`/^votsala$/i`) into one Thursday line (one Booking.com property, one Viva credit). Other groups (e.g. Michalakopoulou) stay **per apartment** — those payouts arrive one by one. Tests: client Pc16/Pc17, server `pcvPayGroup`. Clearing PR #154.
 - **Airbnb** — payout released **~24 h after check-in**, one credit **per reservation**, lands in the bank ~1–3 business days later. Amount = gross − host service fee (Airbnb never bills a separate payment charge).
 - Direct/other channels, cancelled bookings and owner blocks are excluded.
 
