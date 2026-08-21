@@ -1,6 +1,6 @@
 # Elysian — Master Memory Document
 
-**v1.4 · 15 Aug 2026 · maintained by Lefteris + Claude**
+**v1.5 · 21 Aug 2026 · maintained by Lefteris + Claude**
 
 Purpose: the single source of truth about Elysian for any Claude session. Keep this in the Claude project (suggested path `claude/elysian-memory.md`), alongside the feature docs.
 
@@ -43,7 +43,9 @@ Lifetime (May 2025 – Jun 2026): 4,370 checkouts · €696,210 gross · €589,
 
 **Every rate is per-apartment data in the Configuration tab, never a constant.** Management fee %, cleaning fee, all VAT/tax behaviour, business tax, fixed charges, report language — all live in `S.apts` and vary by property/profile. **Never hard-code a rate; read it live.** Schema (from the live app, 27 Jul 2026):
 
-`id · name · aliases · city · lat/lng · profile · isLeased · b2b · b2bPartner · b2bRemitRate · mgmtFee · cleaningFee · fixedCharges[] · businessTax · chargeVat · deductVAT · vatLiable · vatOnFees · municipalityTax · deductCT · deductCleaning · language · ownerName · ownerSurname · ownerEmail · postReportReminders[]`
+`id · name · aliases · city · lat/lng · profile · isLeased · b2b · b2bPartner · b2bRemitRate · mgmtFee · cleaningFee · fixedCharges[] · businessTax · businessTaxAmt · chargeVat · deductVAT · vatLiable · vatOnFees · municipalityTax · deductCT · deductCleaning · language · ownerName · ownerSurname · ownerEmail · ownerEmail2 · ownerEmail3 · ownerPhone · postReportReminders[] · clearGroup · bookingHotelId · oxyContactId · oxyContactName`
+
+**`clearGroup`** is for owner reports. **Payments Check / Viva only collapse Votsala** (one Booking.com property, one Thursday credit). Other groups stay per-apartment. **`bookingHotelId`** is the Booking.com extranet id printed on host invoices (Votsala 1–8 share one). Full per-unit freeze: `claude/apartment-catalog.md`.
 
 ### Property profiles
 
@@ -82,21 +84,22 @@ Catalogue: **Software**, **Business Tax**, and **utilities — electricity / int
 
 ### Tab map (from code, 27 Jul 2026; Accounting/Admin nav 15 Aug 2026)
 
-**Top bar (10):** Dashboard (`dash`) · Bookings (`bk`) · Expenses (`exp`) · Configuration (`cfg`) · Reports (`rpt`) · Annual Tracker (`ann`) · 📋 Monthly Tasks (`mt`) · 💰 Elysian Revenue (`rev`) · 🗓 Daily Ops (`ops`) · 📊 Performance (`perf`)
-**🧰 Tools dropdown (4):** Checkout Tracker (`co`) · Hosthub API (`hhapi`) · Imports incl. Run Tests (`imports`) · 💳 Payments Check (`pay`)
+**Top bar (base `index.html`, 21 Aug 2026):** Dashboard (`dash`) · Bookings (`bk`) · Expenses (`exp`) · Configuration (`cfg`) · Reports (`rpt`) · Annual Tracker (`ann`) · 📋 Monthly Tasks / Monthly Close (`mt`) · 💰 Elysian Revenue (`rev`) · 🗓 Daily Ops (`ops`) · 📊 Performance (`perf`) · 🏷 Property Info (`pinfo`)
+**Patched in (boot chain tip FE 127 / SRV 91):** **Keys Hubs** (`keys`) · Home Open-leads / viewings · Platform Invoices as Accounting/Admin primary tab · Personnel (`emp`, operators may open it)
+**🧰 Tools dropdown:** Checkout Tracker (`co`) · Hosthub API (`hhapi`) · Imports incl. Run Tests (`imports`) · 💳 Payments Check (`pay`) · Change Log (`log`)
 
-**Accounting / Admin (15 Aug 2026):** **Platform Invoices** is a **primary tab** (sidebar icon) — not only a Tools item. **Property Info** is reachable from the Admin sidebar. **Personnel** is Admin-only (operators may open it). Daily Ops Beta UI is the operator-facing `/daily-ops` (Admin).
+**Accounting / Admin:** **Platform Invoices** is a primary tab (sidebar icon, 15 Aug). **Property Info** is reachable from the Admin sidebar (moved up, scrollable nav). **Personnel** is on the operator access list. **Keys Hubs** is operators + Admin, not accountant. Daily Ops Beta table UI was **promoted to `#tab-ops`** (15 Aug) — no dual Beta tab. Home (20 Aug): Open leads chip + Book a viewing appointments (`claude/home-viewings-feature.md`).
 
 Key behaviours: Reports has **report locking** (`rptLocks`) with the intentional **amber drift banner** when locked figures later change; report delivery: **📧 Email report to owner** (v12, 4–5 Aug 2026) — real PDF attachment, bilingual compose modal with embedded page-1 preview, sent via `/api/email/send`; sent-record in `S.rptLocks[key].email`; manual PDF download still available (see `claude/email-report-feature.md`). Report language per apartment (`language`).
 
 ### Server API surface (from code)
-`GET/POST /api/db/data` (shared-state pipeline) · `GET /api/db/status` · `POST /api/sync`, `/api/sync-cancelled` · `GET /api/discover`, `/api/history`, `/api/auto-sync-status`, `/api/server-config` · `GET/POST /api/session` (auth) · `POST /api/login` · `GET /api/me` · `/api/logout` · proofs: `POST/GET/DELETE /api/proofs`, `GET /api/proofs/:id` (table `proof_files`, auto-created) · Viva: `GET /api/viva/status`, `GET /api/viva/probe`, `POST /api/viva/check-now` (90 s cap) · email: `GET /api/email/status`, `POST /api/email/send`, `GET /api/email/probe` (diagnostics) · fe: `GET /api/fe-info` (auth-exempt release check) · Oxygen diag: `GET /api/oxygen/status`, `GET /api/oxygen/test-issue` (**sandbox-only**, PR #5) · Platform Invoices: `/api/platform-invoices`, `/api/platform-invoices/collect`, `/api/platform-invoices/expect`, `POST /api/platform-invoices/pull`, `GET /api/platform-invoices/pull/:id`, `POST /api/platform-invoices/pull-stop`, `GET /api/platform-invoices/:id/file`, `/api/platform-invoices/ship`. Pull jobs live **in memory** on the worker (lost on restart). Same month+channel POST **resumes** a running job. · `GET /health` · debug: `POST /api/debug-cancelled`, `/api/debug-checkin`. **Server-side anti-wipe** protects `monthlyTasks` and `payChk`.
+`GET/POST /api/db/data` (shared-state pipeline) · `GET /api/db/status` · `POST /api/sync`, `/api/sync-cancelled` · `GET /api/discover`, `/api/history`, `/api/auto-sync-status`, `/api/server-config` · `GET/POST /api/session` (auth) · `POST /api/login` · `GET /api/me` · `/api/logout` · proofs: `POST/GET/DELETE /api/proofs`, `GET /api/proofs/:id` (table `proof_files`, auto-created) · Viva: `GET /api/viva/status`, `GET /api/viva/probe`, `POST /api/viva/check-now` (90 s cap) · email: `GET /api/email/status`, `POST /api/email/send`, `GET /api/email/probe` (diagnostics) · fe: `GET /api/fe-info` (auth-exempt release check) · Oxygen diag: `GET /api/oxygen/status`, `GET /api/oxygen/test-issue` (**sandbox-only**, PR #5) · Platform Invoices: `/api/platform-invoices`, `/api/platform-invoices/collect`, `/api/platform-invoices/expect`, `POST /api/platform-invoices/pull`, `GET /api/platform-invoices/pull/:id`, `POST /api/platform-invoices/pull-stop`, `GET /api/platform-invoices/:id/file`, `/api/platform-invoices/ship`. Pull jobs live **in memory** on the worker (lost on restart). Same month+channel POST **resumes** a running job. Huge pull payloads go via **files** (`PI_APARTMENTS_FILE`) so spawn is not E2BIG. Booking.com IP-block cooldown persists in Postgres. · `GET /health` · debug: `POST /api/debug-cancelled`, `/api/debug-checkin`. **Server-side anti-wipe** protects `monthlyTasks`, `payChk`, Keys Hubs maps (`keyHubs` / `keyLabels` / `keyLockbox`), and filled `bookingHotelId`.
 
 ### Railway env (names from code)
-`APP_PASSWORD` (fallback) · `USERS_JSON` (**set on Railway**, 15 Aug 2026) · `AUTO_SYNC_HOUR` · `HOSTHUB_API_KEY` · `DATABASE_URL` / `DATABASE_PRIVATE_URL` / `POSTGRES_URL` / `POSTGRES_PRIVATE_URL` / `PG*` family · `PORT` · `VIVA_TX_USER` · `VIVA_TX_PASS` · `VIVA_ENV` · `VIVA_BASE_URL` · `VIVA_ACCOUNTS_URL` · email: `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` + `EMAIL_FROM` / `EMAIL_REPLY_TO` / `EMAIL_BCC` (⚠ **Railway firewalls all outbound SMTP below the Pro plan** — plan upgraded to Pro 5 Aug 2026; new network rules apply only to fresh deploys, so redeploy once after any plan change) · Oxygen: `OXYGEN_API_KEY` (sandbox key set 5 Aug) / `OXYGEN_API_BASE` (defaults to sandbox in code) · Platform Invoices: `AIRBNB_HOST_EMAIL` / `AIRBNB_HOST_PASSWORD` · optional `AIRBNB_STORAGE_STATE_B64` · `PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `BOOKING_HOST_*` (pull parked). **Postgres backup status: unverified** (Railway navigation was declined in-browser) — open loop: check Railway → Postgres service → Backups; if absent, enable or schedule `pg_dump`.
+`APP_PASSWORD` (fallback) · `USERS_JSON` (**set on Railway**, 15 Aug 2026) · `AUTO_SYNC_HOUR` · `HOSTHUB_API_KEY` · `DATABASE_URL` / `DATABASE_PRIVATE_URL` / `POSTGRES_URL` / `POSTGRES_PRIVATE_URL` / `PG*` family · `PORT` · `VIVA_TX_USER` · `VIVA_TX_PASS` · `VIVA_ENV` · `VIVA_BASE_URL` · `VIVA_ACCOUNTS_URL` · email: `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` + `EMAIL_FROM` / `EMAIL_REPLY_TO` / `EMAIL_BCC` (⚠ **Railway firewalls all outbound SMTP below the Pro plan** — plan upgraded to Pro 5 Aug 2026; new network rules apply only to fresh deploys, so redeploy once after any plan change) · Oxygen: `OXYGEN_API_KEY` (sandbox key set 5 Aug) / `OXYGEN_API_BASE` (defaults to sandbox in code) · Platform Invoices: `AIRBNB_HOST_EMAIL` / `AIRBNB_HOST_PASSWORD` · optional `AIRBNB_STORAGE_STATE_B64` · `PLATFORM_INVOICE_ACCOUNTANT_EMAIL` · `BOOKING_HOST_*` (Connect + mass extract **live** 16 Aug). **Postgres backup status: unverified** (Railway navigation was declined in-browser) — open loop: check Railway → Postgres service → Backups; if absent, enable or schedule `pg_dump`.
 
 ### Global `S` object (primary data interface in the browser)
-`S.apts` · `S.bks` · `S.revenue.mgmt` / `S.revenue.cleaning` · `S.payChk` (+ `payChk.bank.lastResult`) · `monthlyTasks` / `monthlyTaskDefs` · `rptLocks`.
+`S.apts` · `S.bks` · `S.revenue.mgmt` / `S.revenue.cleaning` · `S.payChk` (+ `payChk.bank.lastResult`) · `monthlyTasks` / `monthlyTaskDefs` · `rptLocks` · `S.keyHubs` / `S.keyLabels` / `S.keyLockbox` (Keys Hubs).
 
 ---
 
@@ -125,7 +128,7 @@ Key behaviours: Reports has **report locking** (`rptLocks`) with the intentional
 ## 5. Payments — what should land in Viva
 
 ### Booking.com
-- `payout(Thursday T) = Σ reservations with checkout ∈ [T−7, T−1]` — every checkout pays on the **first Thursday strictly after it** (Wed → next-day Thu; Thu → +7). **One credit per property per Thursday.**
+- `payout(Thursday T) = Σ reservations with checkout ∈ [T−7, T−1]` — every checkout pays on the **first Thursday strictly after it** (Wed → next-day Thu; Thu → +7). **One credit per property per Thursday**, except **Votsala 1–8 share one Booking.com / Viva credit** (`clearGroup` matching `/^votsala$/i`). Other Configuration `clearGroup`s are report-only and stay per-apartment in Payments Check (21 Aug, PR #154).
 - Expected = **gross − commission − payment charges** (Hosthub "Total Payout") **− `trChan`**. Validated: Birdhouse, Thu 23 Jul 2026.
 - **1-cent quirk**: Hosthub rounds the 1.6% payment charge down, BDC to nearest → ~1 cent high per reservation; harmless, absorbed by ±€1.
 - **Guest-pays-at-property** reservations carry no per-booking fees — BDC invoices that commission **monthly** (the Joël Ollivier / Art House pattern, pending Hosthub verification). Fee-integrity flags mark batches with missing fees.
@@ -155,7 +158,7 @@ Auto-reconciliation Saturday 08:00 Europe/Athens + "✓ Check now". Blocked on O
 
 **Dating (15 Aug 2026, Lefteris):** The **month** of a document is the **VAT HTML invoice issue date** (the date printed on the invoice), **not** Hosthub `created` / `cancelledAt`. Hosthub dates only tell you **which stay to open**. One stay can produce several documents in different months (normal, cancel, extend). Pull `kind: 'both'` for every code. Expected counts: 1 stay → 1 document; 1 cancel → 2; 1 extend → 3; n extends → `(1 + 2n)`. Store each PDF under the month of **its own** issue date. **Do not** use Hosthub created/cancel dates as the archive month. **Do not** dump a stay's documents into one month just because Hosthub listed the stay there.
 
-Airbnb pull = **Hosthub reservation codes** (`reservationId` / channel `reservation_id`), not a calendar scrape. Booking.com pull is parked. Ship is PDFs + `Airbnb-VAT-YYYY-MM.xls` to **E-New Generation** (`info@e-newgeneration.gr`) and `info@elysianproperties.eu`. Lefteris wants this **ASAP**. Private owners: none (no `?owners=`).
+Airbnb pull = **Hosthub reservation codes** (`reservationId` / channel `reservation_id`), not a calendar scrape. Booking.com pull is **live** (16 Aug): headed Connect + Finance → Invoices **mass extract**; one PDF per Booking property; Votsala = one PDF; file by `bookingHotelId`; **no BDC Excel**. Ship is PDFs + `Airbnb-VAT-YYYY-MM.xls` to **E-New Generation** (`info@e-newgeneration.gr`) and `info@elysianproperties.eu`. Lefteris wants this **ASAP**. Private owners: none (no `?owners=`).
 
 ⚠ The app long modelled this as **one** Monthly Tasks line (`ota_inv`); Monthly Close + the Platform Invoices tab are the current home — keep the 20th/25th split when working the packs.
 
@@ -197,12 +200,36 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 
 ### 15 Aug 2026 — session additions
 
-- **Airbnb platform-invoice pull is live.** Two-code test (`HM9DCDMEXT`, `HMWRNAWHBA`, month `2026-07`) saved real AIUC PDFs from `www.airbnb.gr` (job `ppmsuw193wm05or`). Capture path: stay page → total price → fetch `/invoice/{token}` + `/vat_invoices/{token}` → **new tab on `www.airbnb.gr`** (address-bar `goto` of `/invoice/` or `/reservation/vat_invoice/` on `.com` is a soft 404). File month = **VAT HTML issue date**. Parser takes **Subtotal €**, not VAT rate `0.0%`. Vault `total` on those two test rows is still **0** until re-ingest. Booking.com pull is **parked**. Collect is Admin-only. Keep UI strings: `Pull Airbnb (Hosthub codes)`, `channel: 'airbnb'`. See `claude/platform-invoices-feature.md`.
-- **Daily Ops Beta UI** and **Personnel** remain as of 8 Aug (operator-facing `/daily-ops`; Admin `/personnel`).
+- **Airbnb platform-invoice pull is live.** Two-code test (`HM9DCDMEXT`, `HMWRNAWHBA`, month `2026-07`) saved real AIUC PDFs from `www.airbnb.gr` (job `ppmsuw193wm05or`). Capture path: stay page → total price → fetch `/invoice/{token}` + `/vat_invoices/{token}` → **new tab on `www.airbnb.gr`** (address-bar `goto` of `/invoice/` or `/reservation/vat_invoice/` on `.com` is a soft 404). File month = **VAT HTML issue date**. Parser takes **Subtotal €**, not VAT rate `0.0%`. Vault `total` on those two test rows is still **0** until re-ingest. Booking.com pull was still parked on this day — **unparked 16 Aug** (see 21 Aug weekly block). Collect is Admin-only. Keep UI strings: `Pull Airbnb (Hosthub codes)`, `channel: 'airbnb'`. See `claude/platform-invoices-feature.md`.
+- **Daily Ops Beta UI** was promoted to the main Daily Ops tab 15 Aug. **Personnel** remains as of 8 Aug (operators may open it). **Keys Hubs** shipped 20 Aug.
+
+### 21 Aug 2026 — weekly review (15–21 Aug)
+
+Sweep of `lete13/elysian-clearing` `main` since memory v1.4. Unattended run — no live `S` re-pull.
+
+**Shipped on clearing `main` this week**
+- **Platform Invoices vault** = apartment → platform → year → month (folders start closed). Expect vs vault gaps + Pull incomplete. Airbnb PDFs archived by VAT issue date; parser uses Subtotal €. Spawn E2BIG fixed by writing pull JSON to files (PR #148).
+- **Booking.com pull unparked** (16 Aug): in-app Connect (headed Chrome / Xvfb; HeadlessChrome refused; password decoy ignored); IP-block cooldown in Postgres; July Finance mass-extract by `bookingHotelId`; Votsala = one PDF. Collect button: Pull Booking.com.
+- **Daily Ops** (15–16 Aug): Beta table promoted to `#tab-ops`; ops-urgency colours; icon flags; same-day pairing by canonical apartment; clipboard screenshot fallback + html2canvas-pro colour fix.
+- **Home** (20 Aug): Open leads chip + Book a viewing appointments / week strip. Viewing team includes Kostas and Michalis.
+- **Keys Hubs** (20 Aug): backup-key locations, nearest stored key, persist + anti-wipe; operator sidebar.
+- **Payments Check** (21 Aug): only Votsala uses `clearGroup` for payout batches (PR #154).
+
+**Open on clearing (not merged as of 21 Aug)**
+- PR #153 Daily Ops: currently-hosting `extend …` must not skip-clean the arrival (Resilience 21 Aug false positive — see `claude/daily-ops-extended-false-positive.md`).
+- PR #155 Block private/B2B send unless ΑΠΥ/ΤΠΥ was issued.
+- PR #149 Booking.com apartment id map completeness.
+- PR #145 Skip vaulted Airbnb stays on pull retry.
+
+**Apartment freeze:** `claude/apartment-catalog.md` + `.json` — 57 live-directory units + 52 seed financials from `DEFAULT_APT_CONFIG`. Five units exist only in live Configuration. Seed dual-flags are **not** trusted over the 27 Jul profiles.
+
+**Still blocked / unchanged:** Viva `biservices:datafileapi` · Railway Postgres backups unverified · Art Island sign, 67 expenses, Votsala 2–8 P4, Joël Ollivier, `b2bPartner` empty, four unset languages. Previous-Balance display patch still listed as unpushed.
 
 ---
 
 ## 9. Property directory (live pull 27 Jul 2026 — profile/language/BT from `S.apts`)
+
+Full owner / fee / software-charge freeze from the clearing seed sheet, plus live-profile overlay: **`claude/apartment-catalog.md`** (JSON: `claude/apartment-catalog.json`). Re-pull live `S.apts` on the next attended session for `bookingHotelId`, emails, coords, Keys Hubs, Property Info.
 
 ᵀ = Thessaloniki operation (8) · ★ = golden test property · BT = businessTax flag · Lang — = unset.
 
@@ -266,7 +293,7 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 | 56 | Votsala 7 Small & Elegant Apartment in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
 | 57 | Votsala 8 Elegant & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
 
-Owner names/emails and per-unit rates live in `S.apts` / Configuration — read live when needed (fine to use; only the ΑΦΜ is excluded from docs).
+Owner names, per-unit rates, and seed vs live flag notes: **`claude/apartment-catalog.md`**. Only the ΑΦΜ is excluded from docs. Seed `DEFAULT_APT_CONFIG` has 52 of 57 units (missing: A modern & Peaceful, Elysian Agon, Elysian Ithaki, The Skarlatos residence, Vista Acropolis). `b2bPartner` and owner emails are empty in the seed sheet.
 
 ---
 
@@ -284,7 +311,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026; Votsala-only grouping 21 Aug) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (21 Aug 2026 — Airbnb pull live; Booking.com mass extract live; file Airbnb by VAT issue date) · `claude/keys-hubs-feature.md` (20 Aug 2026) · `claude/home-viewings-feature.md` (20 Aug 2026) · `claude/daily-ops-extended-false-positive.md` (21 Aug 2026) · `claude/apartment-catalog.md` (21 Aug 2026)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
@@ -311,6 +338,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **v1.5 (21 Aug 2026)** — Weekly review 15–21 Aug: Booking.com platform-invoice **mass extract live** (headed Connect, IP-block cooldown, `bookingHotelId`, Votsala = one PDF, no BDC Excel); vault folders; Keys Hubs; Home viewings; Daily Ops Beta promoted; Payments Check **only Votsala** uses `clearGroup`; apartment catalog freeze (57 live + 52 seed). Docs: `claude/platform-invoices-feature.md`, `claude/keys-hubs-feature.md`, `claude/home-viewings-feature.md`, `claude/daily-ops-extended-false-positive.md`, `claude/apartment-catalog.md`, `claude/payments-check-feature.md`. Source: clearing `main` `9d46016` (PRs #114–#154). Open: clearing #153/#155/#149/#145. Unattended — no live `S` re-pull.
 - **v1.4 (15 Aug 2026)** — Platform Invoices Airbnb pull **live** (new-tab `www.airbnb.gr` capture; archive by **VAT issue date**, not Hosthub `created`/`cancelledAt`; Hosthub codes; Excel ship). Two-code test saved real AIUC PDFs (job `ppmsuw193wm05or`). Booking.com parked. `USERS_JSON` confirmed on Railway. Platform Invoices is a primary Accounting/Admin tab. Daily Ops Beta UI and Personnel remain as of 8 Aug. Doc: `claude/platform-invoices-feature.md`. Source: live Collect 15 Aug 2026; Lefteris dating rule; clearing `main` `db13617` / `5eff0da`.
 - **13 Aug 2026** — Platform invoices: **Airbnb = Hosthub `reservationId` → confirmation-code pull** (VAT Invoicer-style); Booking.com pull parked for now. Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices: **pull-first automation** (DB portal sessions, multi-property Booking pull, upload emergency-only). Doc: `claude/platform-invoices-feature.md`.
