@@ -21,7 +21,7 @@ If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read 
 These exist because a wrong number here is real money leaving or missing from a real owner's remittance.
 
 1. **Never push to production.** Edit locally under `/mnt/user-data/outputs/elysian-clearing/`, present the files, and let Lefteris review and push.
-2. **Configuration is the source of truth for every rate.** Management fee, cleaning fee, VAT/tax behaviour, business tax, fixed charges, report language — all per-apartment in `S.apts` (fields: `profile, isLeased, b2b, b2bPartner, b2bRemitRate, mgmtFee, cleaningFee, fixedCharges[], businessTax, chargeVat, deductVAT, vatLiable, vatOnFees, municipalityTax, deductCT, deductCleaning, language, owner*`). **Never hard-code a rate; read it live.**
+2. **Configuration is the source of truth for every rate.** Management fee, cleaning fee, VAT/tax behaviour, business tax, fixed charges, report language — all per-apartment in `S.apts` (fields: `profile, isLeased, b2b, b2bPartner, b2bRemitRate, mgmtFee, cleaningFee, fixedCharges[], businessTax, chargeVat, deductVAT, vatLiable, vatOnFees, municipalityTax, deductCT, deductCleaning, language, owner*, clearGroup, bookingHotelId`). Frozen copy: `claude/apartment-catalog.md`. **Never hard-code a rate; read it live.** **Payments Check only groups Votsala**; other `clearGroup`s are report-only.
 3. **Never *initiate* money-moving changes** — expense attribution, profile or tax flags, sign corrections, `moOverride` steppers, edits to locked reports. Compute the impact, state it in euros per owner per month, and wait for an explicit yes on that specific item. **When Lefteris explicitly requests a specific action** ("tick the Birdhouse payout", "mark TAKK done for X", "enable that flag"), execute it in the live app via the browser — the decision is his; the clicking doesn't have to be. Follow the write protocol below for anything that saves config.
 4. **Respect the open-decision list** (bottom). Analysis touching Art Island, the 67 unassigned expenses, Votsala 2–8, or the Joël Ollivier booking must surface the pending decision — never quietly "fix" it.
 5. **Drift banners are a feature.** The amber banner on a locked report (`rptLocks`) means locked figures changed after sending. Explain what moved and why; never suppress it.
@@ -68,7 +68,7 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 
 1. **TAKK Issuance** (private apartments) — issue the ειδικό στοιχείο per stay; upload proof per apartment line.
 2. **TAKK Payment** (private apartments) — pay what was issued; proof per line. (Statutory δήλωση deadline is month-end — internal 20th is the buffer; filer confirmation pending.)
-3. **Platform invoices, leased / Elysian-tax units** — pull **ASAP** after portal documents exist. **Dating = the VAT issue date printed on the PDF/HTML**, not Hosthub `created` / `cancelledAt` (those only decide which stay to open). One stay can yield several docs (normal ×1, cancel ×2, 1 extend ×3, n extends × `(1+2n)`); file each under **its own** issue month. In the app: Platform Invoices (Accounting/Admin tab) → month → Expect → Collect → **Pull Airbnb (Hosthub codes)**. **Test pull** = `HM9DCDMEXT` and `HMWRNAWHBA` (not “latest 5”). A **0 PDF** result is a failure. Booking.com pull is parked. Ship = PDFs + `Airbnb-VAT-YYYY-MM.xls` (Πρόσημο `-` on credits) to `info@e-newgeneration.gr` + `info@elysianproperties.eu`. See `claude/platform-invoices-feature.md`.
+3. **Platform invoices, leased / Elysian-tax units** — pull **ASAP** after portal documents exist. **Dating = the VAT issue date printed on the PDF/HTML**, not Hosthub `created` / `cancelledAt` (those only decide which stay to open). One stay can yield several docs (normal ×1, cancel ×2, 1 extend ×3, n extends × `(1+2n)`); file each under **its own** issue month. In the app: Platform Invoices (one-page Retrieve) → month → Expect → Collect → **Pull Airbnb (Hosthub codes)** and **Pull Booking.com** (or Finance zip). **Test pull** = `HM9DCDMEXT` and `HMWRNAWHBA` (not “latest 5”). A **0 PDF** result is a failure. Booking.com = Finance mass extract / zip, one PDF per property (**Votsala = `13180441`**), file by `bookingHotelId`. Ship via **accountant cards** (PDFs + Excel; packs split `1/N`; **Ship anyway** if reconcile is blocked). Recipients for Elysian’s own pack: `info@e-newgeneration.gr` + `info@elysianproperties.eu` unless the stored card list says otherwise. See `claude/platform-invoices-feature.md`.
 
 ### Wave 3 — B2B / external groups (platform invoices)
 
@@ -83,7 +83,7 @@ Drive the "left to do" counter to zero, escalating as the 10th/20th/25th near wi
 
 ## Runbook B — Payments reconciliation (Viva account)
 
-**Booking.com**: `payout(Thursday T) = Σ checkouts ∈ [T−7, T−1]` — each checkout pays on the first Thursday strictly after it. **One credit per property per Thursday.** Expected = gross − commission − payment charges (Hosthub "Total Payout") − `trChan`. Validated against Birdhouse's real statement, Thu 23 Jul 2026.
+**Booking.com**: `payout(Thursday T) = Σ checkouts ∈ [T−7, T−1]` — each checkout pays on the first Thursday strictly after it. **One credit per property per Thursday**, except **Votsala 1–8 share one credit**. Other `clearGroup` values are owner-report only — do not batch them in Payments Check (21 Aug 2026, Pc16/Pc17). Expected = gross − commission − payment charges (Hosthub "Total Payout") − `trChan`. Validated against Birdhouse's real statement, Thu 23 Jul 2026.
 
 **Airbnb**: released ~24 h after **check-in**, one credit **per reservation**, bank in ~1–3 business days. Expected = gross − host service fee (never a payment charge).
 
@@ -140,7 +140,7 @@ Payroll never runs solo — Lefteris participates in and signs off every run.
 
 ## Reading & acting on live data (claude-in-chrome)
 
-Primary interface: the global `S` object — `S.apts`, `S.bks`, `S.revenue.mgmt`, `S.revenue.cleaning`, `S.payChk` (+ `payChk.bank.lastResult`), `monthlyTasks`/`monthlyTaskDefs`, `rptLocks`.
+Primary interface: the global `S` object — `S.apts`, `S.bks`, `S.revenue.mgmt`, `S.revenue.cleaning`, `S.payChk` (+ `payChk.bank.lastResult`), `monthlyTasks`/`monthlyTaskDefs`, `rptLocks`, `S.keyHubs`/`S.keyLabels`/`S.keyLockbox`. Apartment freeze: `claude/apartment-catalog.md`.
 
 Mechanics: `select_browser` requires the **full device UUID**; JS returns truncate at ~900–1,000 chars — return compact delimited strings/slices and stash arrays on `window.__aptRows`; iterate `S.bks` with `reduce` (spreading into `Math.min/max` hangs silently); re-establish tab context after bridge drops. Unattended scheduled runs have no browser — live `S` needs Lefteris's session.
 
