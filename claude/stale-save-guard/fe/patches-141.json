@@ -1,0 +1,33 @@
+{
+ "baseSha256": "ba001e33b4dbec39b6ef14d767f8aafe5b95ad4bfcb00bafbeea97c9d080abfd",
+ "expectedSha256": "377065d711da82d35053454c3c865fa3a86790d17bdbd9c02f543072740c9610",
+ "builtAt": "2026-08-27 Send _baseSavedAt; reload+retry Daily Ops on a stale 409",
+ "patches": [
+  {
+   "note": "Every save carries the generation the tab last loaded",
+   "find": "      keyHubs: S.keyHubs || {},\n      keyLabels: S.keyLabels || {},\n      keyLockbox: S.keyLockbox || {}\n    };",
+   "replace": "      keyHubs: S.keyHubs || {},\n      keyLabels: S.keyLabels || {},\n      keyLockbox: S.keyLockbox || {},\n      _baseSavedAt: _lastDbSave || null\n    };",
+   "count": 1
+  },
+  {
+   "note": "On 409 stale: reload, re-apply Daily Ops slices, retry once",
+   "find": "    if (result.ok) {\n      _lastDbSave = result.savedAt;\n      updateDbBadge();\n    } else if (result.blocked) {\n      console.warn('[db] Write blocked by server:', result.error);\n    }",
+   "replace": "    if (result.ok) {\n      _lastDbSave = result.savedAt;\n      updateDbBadge();\n    } else if (result.stale) {\n      console.warn('[db] stale save rejected — reloading', result.error);\n      const keepDaily = JSON.parse(JSON.stringify(S.daily || {}));\n      const keepCleaners = JSON.parse(JSON.stringify(S.cleaners || []));\n      const keepRoles = JSON.parse(JSON.stringify(S.cleanerRoles || {}));\n      const keepHubs = JSON.parse(JSON.stringify(S.keyHubs || {}));\n      const keepLabels = JSON.parse(JSON.stringify(S.keyLabels || {}));\n      const keepLock = JSON.parse(JSON.stringify(S.keyLockbox || {}));\n      await loadFromDb();\n      if (!window._dbStaleRetry) {\n        window._dbStaleRetry = true;\n        S.daily = keepDaily;\n        S.cleaners = keepCleaners;\n        S.cleanerRoles = keepRoles;\n        S.keyHubs = keepHubs;\n        S.keyLabels = keepLabels;\n        S.keyLockbox = keepLock;\n        if (typeof renderOps === \"function\" && document.getElementById(\"tab-ops\") && document.getElementById(\"tab-ops\").classList.contains(\"active\")) {\n          try { renderOps(); } catch (eOps) {}\n        }\n        try { await saveToDb(_saveGen); }\n        finally { window._dbStaleRetry = false; }\n      } else if (typeof toast === 'function') {\n        toast('Newer data on the server — page reloaded. Re-apply the last change if it vanished.', 'warn');\n      }\n    } else if (result.blocked) {\n      console.warn('[db] Write blocked by server:', result.error);\n    }",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "_baseSavedAt: _lastDbSave || null",
+   "note": "generation token on every save"
+  },
+  {
+   "has": "result.stale",
+   "note": "stale 409 handler"
+  },
+  {
+   "has": "window._dbStaleRetry",
+   "note": "one retry after reload"
+  }
+ ]
+}

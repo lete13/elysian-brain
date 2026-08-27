@@ -1,0 +1,43 @@
+{
+ "baseSha256": "8c6cb0d92049d3d9891862079e836f32c78432f7954004fd471608ba87b6176f",
+ "expectedSha256": "5c257218b2e090a0c791e219c785bd8a31fad0c660be8db231fe7adee6d0f160",
+ "builtAt": "2026-08-27 Reject stale full-document saves so Configuration cannot drift",
+ "patches": [
+  {
+   "note": "POST /api/db/data: reject a client that did not load the current generation",
+   "find": "    // Read current DB state\n    const cur = await pool.query(\"SELECT data FROM app_data WHERE key = 'main'\");\n    const existing = cur.rows[0]?.data;\n\n    if (existing) {",
+   "replace": "    // Read current DB state (updated_at is the generation token)\n    const cur = await pool.query(\"SELECT data, updated_at FROM app_data WHERE key = 'main'\");\n    const existing = cur.rows[0]?.data;\n    const dbUpdatedAt = cur.rows[0] && cur.rows[0].updated_at;\n    const clientBase = payload && (payload._baseSavedAt || payload._savedAt);\n    const stale = rejectStaleClientWrite(dbUpdatedAt, payload);\n    if (stale) {\n      console.warn('[db] BLOCKED stale write: client base', clientBase, 'db', dbUpdatedAt);\n      logEvent(req, 'data', '⚠ blocked stale', 'client base ' + String(clientBase || '(none)') + ' vs db ' + String(dbUpdatedAt || ''));\n      return res.status(409).json(stale);\n    }\n\n    if (existing) {",
+   "count": 1
+  },
+  {
+   "note": "rejectStaleClientWrite helper (missing/old _baseSavedAt → 409)",
+   "find": "function mergeAptsProtect(dbApts, inApts) {",
+   "replace": "function rejectStaleClientWrite(dbUpdatedAt, payload) {\n  const force = !!(payload && payload._forceStale === true);\n  const base = payload && (payload._baseSavedAt || payload._savedAt);\n  if (payload) {\n    delete payload._baseSavedAt;\n    delete payload._savedAt;\n    delete payload._forceStale;\n  }\n  if (force || !dbUpdatedAt) return null;\n  const dbMs = new Date(dbUpdatedAt).getTime();\n  if (!isFinite(dbMs)) return null;\n  const baseMs = base ? new Date(base).getTime() : NaN;\n  // Missing token = unpatched / never-loaded tab (14 Aug class).\n  // Older token = tab loaded a previous generation. 1.5s covers debounce + clock.\n  if (!isFinite(baseMs) || dbMs - baseMs > 1500) {\n    return {\n      ok: false,\n      stale: true,\n      blocked: true,\n      error: 'Stale client: reload before saving. A newer save already landed.',\n      savedAt: dbUpdatedAt,\n    };\n  }\n  return null;\n}\nfunction mergeAptsProtect(dbApts, inApts) {",
+   "count": 1
+  },
+  {
+   "note": "FE bootstrap through patches-180 so FE 141 applies",
+   "find": "for (let cn = 2; cn <= 140; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */",
+   "replace": "for (let cn = 2; cn <= 180; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */ /* cn <= 140 */",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "function rejectStaleClientWrite(",
+   "note": "stale-write helper"
+  },
+  {
+   "has": "SELECT data, updated_at FROM app_data WHERE key",
+   "note": "generation token is read with the blob"
+  },
+  {
+   "has": "logEvent(req, 'data', '⚠ blocked stale'",
+   "note": "changelog row on a blocked stale save"
+  },
+  {
+   "has": "cn <= 180",
+   "note": "FE chain cap raised for patches-141"
+  }
+ ]
+}
