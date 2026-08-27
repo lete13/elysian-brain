@@ -1,17 +1,82 @@
-commit 6863fc51ca95dc0db99e8ddff7708ce8ddda5b20
-Author: Cursor Agent <cursoragent@cursor.com>
-Date:   Thu Aug 27 20:00:14 2026 +0000
-
-    Prefer missing Hosthub climate-tax stays when filling the 500-per-cycle cap.
-    
-    The 22 Aug rate-limit wipe left ct=0 on almost every booking. SRV 101 then
-    sorted all 90-day events by checkout date, so future stays and unpaid
-    preparations filled the cap and the backlog never drained. Fetch missing
-    paid stays first, keep a 50-slot refresh, and reset fetchPages 429 retries
-    per page.
-
+diff --git a/fe/patches-141.json b/fe/patches-141.json
+new file mode 100644
+index 0000000..3b02892
+--- /dev/null
++++ b/fe/patches-141.json
+@@ -0,0 +1,71 @@
++{
++ "baseSha256": "ba001e33b4dbec39b6ef14d767f8aafe5b95ad4bfcb00bafbeea97c9d080abfd",
++ "expectedSha256": "9c31eff41a1d419efcf446e29bec2389d105fd8902749c97c2d3705c343c330c",
++ "builtAt": "2026-08-27 Full Hosthub pull including taxes + failed-sync banner",
++ "patches": [
++  {
++   "note": "Dashboard button pulls the full database including taxes",
++   "find": "        <i class=\"ti ti-refresh\"></i> Sync all bookings",
++   "replace": "        <i class=\"ti ti-refresh\"></i> Pull full database (incl. taxes)",
++   "count": 1
++  },
++  {
++   "note": "Banner copy names the full tax pull",
++   "find": "        <div id=\"sync-banner-status\" style=\"font-size:12px;color:rgba(201,168,76,.7);margin-top:3px\">Pull all bookings directly from your Hosthub account</div>",
++   "replace": "        <div id=\"sync-banner-status\" style=\"font-size:12px;color:rgba(201,168,76,.7);margin-top:3px\">Pull every booking and its Greek taxes (TAKK / VAT / accommodation) from Hosthub</div>",
++   "count": 1
++  },
++  {
++   "note": "initSyncUI surfaces hosthubSyncFailed",
++   "find": "    if (last) sub.textContent = `Last synced: ${new Date(last).toLocaleString('el-GR')}`;\n    else sub.textContent = 'API key configured — click to sync all bookings';",
++   "replace": "    if (S.meta && S.meta.hosthubSyncFailed) {\n      sub.textContent = 'Hosthub sync failed' + (S.meta.hosthubSyncFailedReason ? (' — ' + S.meta.hosthubSyncFailedReason) : '') + '. Pull the full database including taxes (' + (S.meta.hosthubTaxBacklog || 0) + ' stays missing).';\n    } else if (last) sub.textContent = `Last synced: ${new Date(last).toLocaleString('el-GR')}`;\n    else sub.textContent = 'API key configured — pull the full database including taxes';",
++   "count": 1
++  },
++  {
++   "note": "Manual sync requests a full tax pull",
++   "find": "      body: JSON.stringify({\n        apiKey: key,\n        rentalsEndpoint:  rentalsResult?.url || null,\n        bookingsEndpoint: bookingsResult?.url || null,\n      })",
++   "replace": "      body: JSON.stringify({\n        apiKey: key,\n        full: true,\n        rentalsEndpoint:  rentalsResult?.url || null,\n        bookingsEndpoint: bookingsResult?.url || null,\n      })",
++   "count": 1
++  },
++  {
++   "note": "Keep Hosthub event ids so tax reuse can match later syncs",
++   "find": "        id:    gid(),                  // fresh local ID",
++   "replace": "        id:    b.id || gid(),          // Hosthub event id — gid() broke tax reuse",
++   "count": 1
++  },
++  {
++   "note": "Reload from DB after the server persists a full pull",
++   "find": "    if (!finalData) throw new Error('Sync stream ended without data. Check the server console for errors.');\n\n    syncProgress(95);\n    syncLog(`\\nProcessing ${finalData.bookings.length} bookings…`, 'warn');\n\n    // Import data into state\n    const prevApts = S.apts.length;\n    S.bks = [];",
++   "replace": "    if (!finalData) throw new Error('Sync stream ended without data. Check the server console for errors.');\n\n    syncProgress(95);\n    const prevApts = S.apts.length;\n    if (finalData.persisted) {\n      syncLog('\\nServer saved the full pull (incl. taxes). Reloading from the database…', 'ok');\n      _dataInitialized = false;\n      await loadFromDb();\n      if (typeof initSyncUI === 'function') initSyncUI();\n    } else {\n    syncLog(`\\nProcessing ${finalData.bookings.length} bookings…`, 'warn');\n\n    // Import data into state\n    S.bks = [];",
++   "count": 1
++  },
++  {
++   "note": "Close the non-persisted client import branch",
++   "find": "      if (_locFilled) syncLog(`Location data added for ${_locFilled} properties (auto-categorization).`, 'ok');\n    }\n\n\n    const nNew = S.apts.length - prevApts;",
++   "replace": "      if (_locFilled) syncLog(`Location data added for ${_locFilled} properties (auto-categorization).`, 'ok');\n    }\n    } // else: client-side import when the server did not persist\n\n\n    const nNew = S.apts.length - prevApts;",
++   "count": 1
++  }
++ ],
++ "assertions": [
++  {
++   "has": "Pull full database (incl. taxes)",
++   "note": "dashboard button is the full tax pull"
++  },
++  {
++   "has": "full: true",
++   "note": "manual sync asks the server for every paid stay's taxes"
++  },
++  {
++   "has": "hosthubSyncFailed",
++   "note": "banner reads the failed-run flag"
++  },
++  {
++   "has": "b.id || gid()",
++   "note": "Hosthub event ids are kept"
++  },
++  {
++   "has": "finalData.persisted",
++   "note": "client reloads the server-persisted pull"
++  }
++ ]
++}
 diff --git a/package.json b/package.json
-index e42c9b9..4f6ff52 100644
+index e42c9b9..54f0be7 100644
 --- a/package.json
 +++ b/package.json
 @@ -6,7 +6,7 @@
@@ -19,10 +84,782 @@ index e42c9b9..4f6ff52 100644
      "start": "node srv-boot.js",
      "dev": "node srv-boot.js",
 -    "test": "node tests/monthly-close-patches.test.js && node tests/home-viewing-appointments.test.js && node tests/airbnb-auth-flow.test.js && node tests/daily-ops-checkin-schedule.test.js && node tests/platform-invoice-booking-block.test.js && node tests/keys-hubs.test.js && node tests/payments-check-votsala-group.test.js",
-+    "test": "node tests/monthly-close-patches.test.js && node tests/home-viewing-appointments.test.js && node tests/airbnb-auth-flow.test.js && node tests/daily-ops-checkin-schedule.test.js && node tests/platform-invoice-booking-block.test.js && node tests/keys-hubs.test.js && node tests/payments-check-votsala-group.test.js && node tests/hosthub-tax-targets.test.js",
++    "test": "node tests/monthly-close-patches.test.js && node tests/home-viewing-appointments.test.js && node tests/airbnb-auth-flow.test.js && node tests/daily-ops-checkin-schedule.test.js && node tests/platform-invoice-booking-block.test.js && node tests/keys-hubs.test.js && node tests/payments-check-votsala-group.test.js && node tests/hosthub-tax-targets.test.js && node tests/hosthub-sync-recovery.test.js",
      "pull:platform-invoices": "node scripts/platform-invoice-pull.js",
      "postinstall": "test \"$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD\" = \"1\" || npx playwright install chromium || true",
      "test:platform-invoices": "node tests/platform-invoice-airbnb-codes.test.js && node tests/platform-invoice-stay-click.test.js && node tests/platform-invoice-vault-folders.test.js && node tests/platform-invoice-pull-midfail.test.js && node tests/platform-invoice-booking.test.js && node tests/platform-invoice-vault-view.test.js && node tests/platform-invoice-booking-block.test.js && node tests/platform-invoice-agent.test.js"
+diff --git a/scripts/_build-hosthub-full-pull-fe.js b/scripts/_build-hosthub-full-pull-fe.js
+new file mode 100644
+index 0000000..3a55bf9
+--- /dev/null
++++ b/scripts/_build-hosthub-full-pull-fe.js
+@@ -0,0 +1,151 @@
++'use strict';
++/**
++ * FE 141: dashboard "Sync all bookings" is a full Hosthub pull including Greek
++ * taxes, reloads from the DB (keeps Hosthub ids), and surfaces hosthubSyncFailed.
++ * Run: node scripts/_build-hosthub-full-pull-fe.js
++ */
++const fs = require('fs');
++const path = require('path');
++const crypto = require('crypto');
++
++const root = path.resolve(__dirname, '..');
++const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
++
++function applyFe(untilName) {
++  let src = fs.readFileSync(path.join(root, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
++  for (let n = 1; ; n++) {
++    const name = n === 1 ? 'patches.json' : 'patches-' + n + '.json';
++    if (name === untilName) break;
++    const file = path.join(root, 'fe', name);
++    if (!fs.existsSync(file)) break;
++    const spec = JSON.parse(fs.readFileSync(file, 'utf8'));
++    if (spec.baseSha256 && sha256(src) !== spec.baseSha256) throw new Error(name + ' base drift');
++    for (const p of spec.patches || []) {
++      const parts = src.split(p.find);
++      if (parts.length - 1 !== (p.count || 1)) throw new Error(name + ' anchor: ' + p.note);
++      src = parts.join(p.replace);
++    }
++    if (spec.expectedSha256 && sha256(src) !== spec.expectedSha256) throw new Error(name + ' expected sha');
++  }
++  return src;
++}
++
++const src = applyFe('patches-141.json');
++const patches = [];
++
++patches.push({
++  note: 'Dashboard button pulls the full database including taxes',
++  find: '        <i class="ti ti-refresh"></i> Sync all bookings',
++  replace: '        <i class="ti ti-refresh"></i> Pull full database (incl. taxes)',
++  count: 1,
++});
++
++patches.push({
++  note: 'Banner copy names the full tax pull',
++  find: '        <div id="sync-banner-status" style="font-size:12px;color:rgba(201,168,76,.7);margin-top:3px">Pull all bookings directly from your Hosthub account</div>',
++  replace: '        <div id="sync-banner-status" style="font-size:12px;color:rgba(201,168,76,.7);margin-top:3px">Pull every booking and its Greek taxes (TAKK / VAT / accommodation) from Hosthub</div>',
++  count: 1,
++});
++
++patches.push({
++  note: 'initSyncUI surfaces hosthubSyncFailed',
++  find: `    if (last) sub.textContent = \`Last synced: \${new Date(last).toLocaleString('el-GR')}\`;
++    else sub.textContent = 'API key configured — click to sync all bookings';`,
++  replace: `    if (S.meta && S.meta.hosthubSyncFailed) {
++      sub.textContent = 'Hosthub sync failed' + (S.meta.hosthubSyncFailedReason ? (' — ' + S.meta.hosthubSyncFailedReason) : '') + '. Pull the full database including taxes (' + (S.meta.hosthubTaxBacklog || 0) + ' stays missing).';
++    } else if (last) sub.textContent = \`Last synced: \${new Date(last).toLocaleString('el-GR')}\`;
++    else sub.textContent = 'API key configured — pull the full database including taxes';`,
++  count: 1,
++});
++
++patches.push({
++  note: 'Manual sync requests a full tax pull',
++  find: `      body: JSON.stringify({
++        apiKey: key,
++        rentalsEndpoint:  rentalsResult?.url || null,
++        bookingsEndpoint: bookingsResult?.url || null,
++      })`,
++  replace: `      body: JSON.stringify({
++        apiKey: key,
++        full: true,
++        rentalsEndpoint:  rentalsResult?.url || null,
++        bookingsEndpoint: bookingsResult?.url || null,
++      })`,
++  count: 1,
++});
++
++patches.push({
++  note: 'Keep Hosthub event ids so tax reuse can match later syncs',
++  find: '        id:    gid(),                  // fresh local ID',
++  replace: '        id:    b.id || gid(),          // Hosthub event id — gid() broke tax reuse',
++  count: 1,
++});
++
++patches.push({
++  note: 'Reload from DB after the server persists a full pull',
++  find: `    if (!finalData) throw new Error('Sync stream ended without data. Check the server console for errors.');
++
++    syncProgress(95);
++    syncLog(\`\\nProcessing \${finalData.bookings.length} bookings…\`, 'warn');
++
++    // Import data into state
++    const prevApts = S.apts.length;
++    S.bks = [];`,
++  replace: `    if (!finalData) throw new Error('Sync stream ended without data. Check the server console for errors.');
++
++    syncProgress(95);
++    const prevApts = S.apts.length;
++    if (finalData.persisted) {
++      syncLog('\\nServer saved the full pull (incl. taxes). Reloading from the database…', 'ok');
++      _dataInitialized = false;
++      await loadFromDb();
++      if (typeof initSyncUI === 'function') initSyncUI();
++    } else {
++    syncLog(\`\\nProcessing \${finalData.bookings.length} bookings…\`, 'warn');
++
++    // Import data into state
++    S.bks = [];`,
++  count: 1,
++});
++
++patches.push({
++  note: 'Close the non-persisted client import branch',
++  find: `      if (_locFilled) syncLog(\`Location data added for \${_locFilled} properties (auto-categorization).\`, 'ok');
++    }
++
++
++    const nNew = S.apts.length - prevApts;`,
++  replace: `      if (_locFilled) syncLog(\`Location data added for \${_locFilled} properties (auto-categorization).\`, 'ok');
++    }
++    } // else: client-side import when the server did not persist
++
++
++    const nNew = S.apts.length - prevApts;`,
++  count: 1,
++});
++
++let out = src;
++for (const [i, p] of patches.entries()) {
++  const parts = out.split(p.find);
++  if (parts.length - 1 !== (p.count || 1)) {
++    throw new Error('patch ' + (i + 1) + ' (' + p.note + '): anchor count ' + (parts.length - 1));
++  }
++  out = parts.join(p.replace);
++}
++
++const cfg = {
++  baseSha256: sha256(src),
++  expectedSha256: sha256(out),
++  builtAt: '2026-08-27 Full Hosthub pull including taxes + failed-sync banner',
++  patches,
++  assertions: [
++    { has: 'Pull full database (incl. taxes)', note: 'dashboard button is the full tax pull' },
++    { has: 'full: true', note: 'manual sync asks the server for every paid stay\'s taxes' },
++    { has: 'hosthubSyncFailed', note: 'banner reads the failed-run flag' },
++    { has: 'b.id || gid()', note: 'Hosthub event ids are kept' },
++    { has: 'finalData.persisted', note: 'client reloads the server-persisted pull' },
++  ],
++};
++
++fs.writeFileSync(path.join(root, 'fe', 'patches-141.json'), JSON.stringify(cfg, null, 1) + '\n');
++console.log('wrote fe/patches-141.json', cfg.expectedSha256);
+diff --git a/scripts/_build-hosthub-sync-recovery-patch.js b/scripts/_build-hosthub-sync-recovery-patch.js
+new file mode 100644
+index 0000000..6bc4c97
+--- /dev/null
++++ b/scripts/_build-hosthub-sync-recovery-patch.js
+@@ -0,0 +1,481 @@
++'use strict';
++/**
++ * SRV 108: Hosthub failed-run flag + full database pull including Greek taxes.
++ * A capped 15-min cycle cannot recover the 22 Aug wipe; a 429 must never
++ * persist climate-tax zeros. Run: node scripts/_build-hosthub-sync-recovery-patch.js
++ */
++const fs = require('fs');
++const path = require('path');
++const crypto = require('crypto');
++
++const root = path.resolve(__dirname, '..');
++const sha = (s) => crypto.createHash('sha256').update(s.replace(/\r\n/g, '\n')).digest('hex');
++
++function applySrv(stopAt) {
++  let src = fs.readFileSync(path.join(root, 'server.js'), 'utf8').replace(/\r\n/g, '\n');
++  for (let n = 1; ; n++) {
++    const name = n === 1 ? 'patches.json' : 'patches-' + n + '.json';
++    if (stopAt && name === stopAt) break;
++    const p = path.join(root, 'srv', name);
++    if (!fs.existsSync(p)) break;
++    const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
++    for (const patch of cfg.patches || []) {
++      const count = src.split(patch.find).length - 1;
++      if (count !== (patch.count || 1)) throw new Error('miss ' + name + ' :: ' + patch.note + ' x' + count);
++      src = src.split(patch.find).join(patch.replace);
++    }
++  }
++  return src;
++}
++
++const src = applySrv('patches-108.json');
++const base = sha(src);
++
++const helpersFind = `function selectGrTaxTargets(bookingEvs, prevBkById, nowMs) {
++  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));
++  const money = v => (v && typeof v === 'object') ? (v.cents || 0) / 100 : (parseFloat(v || 0) || 0);
++  const paid = ev => (money(ev.total_price) || money(ev.guest_paid) || money(ev.total_reservation_price) || money(ev.booking_value)) > 0;
++  const taxCutoff = new Date((nowMs != null ? nowMs : Date.now()) - 90 * 86400 * 1000).toISOString().slice(0, 10);
++  const byDateDesc = (a, b) => String(b.date_to || '').localeCompare(String(a.date_to || ''));
++  const missing = (bookingEvs || []).filter(ev => paid(ev) && (!prevBkById[ev.id] || !hasTaxData(prevBkById[ev.id])));
++  const refresh = (bookingEvs || []).filter(ev => paid(ev) && prevBkById[ev.id] && hasTaxData(prevBkById[ev.id]) && String(ev.date_to || '') >= taxCutoff);
++  missing.sort(byDateDesc);
++  refresh.sort(byDateDesc);
++  // Missing-first: the 22 Aug rate-limit wipe left ct=0 on ~98% of stays. Sorting
++  // all 90-day bookings by date_to filled the 500 cap with future stays that
++  // already had tax, so the backlog never drained. Keep a small refresh slice
++  // for Hosthub revisions; spend the rest of the cap on zeros.
++  const refreshTake = refresh.slice(0, 50);
++  const missingTake = missing.slice(0, Math.max(0, 500 - refreshTake.length));
++  return { taxTargets: missingTake.concat(refreshTake), missingCount: missing.length, refreshCount: refresh.length };
++}`;
++
++const helpersReplace = `function hasStoredGrTax(b) {
++  return !!(b && (b.grTaxOk || (+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));
++}
++
++function applyStoredGrTaxes(bookings, prevBkById, grTaxMap) {
++  (bookings || []).forEach(b => {
++    if (!b) return;
++    if (grTaxMap && Object.prototype.hasOwnProperty.call(grTaxMap, b.id)) {
++      b.grTaxOk = true;
++      return;
++    }
++    const prev = prevBkById && prevBkById[b.id];
++    if (!prev) return;
++    // Always copy previous tax fields when this cycle did not fetch. Writing
++    // ct=0 because Hosthub 429'd the separate gr-taxes endpoint is what wiped TAKK.
++    b.ct = prev.ct; b.bvPrevat = prev.bvPrevat; b.vat = prev.vat; b.at = prev.at;
++    b.nbv = prev.nbv; b.trHost = prev.trHost;
++    if (prev.grTaxOk) b.grTaxOk = true;
++  });
++  return bookings;
++}
++
++function mergeGrTaxIntoExisting(existing, incoming) {
++  const byId = {};
++  (incoming || []).forEach(b => { if (b && b.id != null) byId[b.id] = b; });
++  return (existing || []).map(b => {
++    const n = byId[b.id];
++    if (!n || !hasStoredGrTax(n)) return b;
++    return Object.assign({}, b, {
++      ct: n.ct, vat: n.vat, at: n.at, bvPrevat: n.bvPrevat,
++      nbv: n.nbv, trHost: n.trHost, grTaxOk: n.grTaxOk || b.grTaxOk,
++    });
++  });
++}
++
++function hosthubSyncMetaPatch(meta, result, startedIso, source) {
++  const next = Object.assign({}, meta || {});
++  next.lastSync = startedIso;
++  if (source === 'auto') next.lastAutoSync = startedIso;
++  if (source === 'full') next.lastFullSync = startedIso;
++  next.hosthubBatchSync = {
++    source: source || 'sync',
++    full: !!result.full,
++    taxIncluded: (result.taxFetched || 0) > 0,
++    taxAttempted: result.taxAttempted || 0,
++    taxFetched: result.taxFetched || 0,
++    taxBacklog: result.taxBacklog || 0,
++    taxRateLimited: !!result.taxRateLimited,
++    pagesTruncated: !!result.pagesTruncated,
++    at: startedIso,
++  };
++  next.hosthubTaxBacklog = result.taxBacklog || 0;
++  if (result.syncFailed) {
++    next.hosthubSyncFailed = true;
++    next.hosthubSyncFailedAt = startedIso;
++    next.hosthubSyncFailedReason = result.syncFailed.reason;
++    next.hosthubSyncFailedDetail = result.syncFailed.detail || '';
++  } else if (!(result.taxBacklog > 0)) {
++    delete next.hosthubSyncFailed;
++    delete next.hosthubSyncFailedAt;
++    delete next.hosthubSyncFailedReason;
++    delete next.hosthubSyncFailedDetail;
++    next.lastSuccessfulSync = startedIso;
++    next.lastTaxSync = startedIso;
++  }
++  return next;
++}
++
++function selectGrTaxTargets(bookingEvs, prevBkById, nowMs, opts) {
++  const money = v => (v && typeof v === 'object') ? (v.cents || 0) / 100 : (parseFloat(v || 0) || 0);
++  const paid = ev => (money(ev.total_price) || money(ev.guest_paid) || money(ev.total_reservation_price) || money(ev.booking_value)) > 0;
++  const taxCutoff = new Date((nowMs != null ? nowMs : Date.now()) - 90 * 86400 * 1000).toISOString().slice(0, 10);
++  const byDateDesc = (a, b) => String(b.date_to || '').localeCompare(String(a.date_to || ''));
++  const missing = (bookingEvs || []).filter(ev => paid(ev) && (!prevBkById[ev.id] || !hasStoredGrTax(prevBkById[ev.id])));
++  const refresh = (bookingEvs || []).filter(ev => paid(ev) && prevBkById[ev.id] && hasStoredGrTax(prevBkById[ev.id]) && String(ev.date_to || '') >= taxCutoff);
++  missing.sort(byDateDesc);
++  refresh.sort(byDateDesc);
++  if (opts && opts.full) {
++    // Manual recovery: every paid stay, missing first, no 500 cap. Hosthub's
++    // calendar-event payload has no climate_tax — each stay is a separate GET.
++    return { taxTargets: missing.concat(refresh), missingCount: missing.length, refreshCount: refresh.length, full: true };
++  }
++  // Missing-first: the 22 Aug rate-limit wipe left ct=0 on ~98% of stays. Sorting
++  // all 90-day bookings by date_to filled the 500 cap with future stays that
++  // already had tax, so the backlog never drained. Keep a small refresh slice
++  // for Hosthub revisions; spend the rest of the cap on zeros.
++  const refreshTake = refresh.slice(0, 50);
++  const missingTake = missing.slice(0, Math.max(0, 500 - refreshTake.length));
++  return { taxTargets: missingTake.concat(refreshTake), missingCount: missing.length, refreshCount: refresh.length, full: false };
++}`;
++
++const runSyncFind = `async function runSync(apiKey, onLog) {
++  const log  = (msg, type='info') => { onLog && onLog(msg, type); };
++  const results = { rentals: [], bookings: [], error: false };`;
++
++const runSyncReplace = `async function runSync(apiKey, onLog, opts) {
++  opts = opts || {};
++  const full = !!opts.full;
++  const log  = (msg, type='info') => { onLog && onLog(msg, type); };
++  const results = { rentals: [], bookings: [], error: false, full };`;
++
++const fetchPagesFind = `    try { obj = await hhGet(url, key); } catch(e) { console.error('fetchPages:', e.message); break; }
++    if (obj._err && (obj.status === 429 || obj.status >= 500) && retries < 3) {
++      // Hosthub rate limit: wait for the window to reset, retry the same page.
++      retries++; page--;
++      await new Promise(r => setTimeout(r, 20000 * retries));
++      continue;
++    }
++    if (obj._err) { console.error(\`fetchPages HTTP \${obj.status}\`); break; }
++    retries = 0; // retry budget is per page, not per fetchPages call`;
++
++const fetchPagesReplace = `    try { obj = await hhGet(url, key); } catch(e) {
++      console.error('fetchPages:', e.message);
++      all._truncated = true; all._errStatus = 0;
++      break;
++    }
++    if (obj._err && (obj.status === 429 || obj.status >= 500) && retries < 3) {
++      // Hosthub rate limit: wait for the window to reset, retry the same page.
++      retries++; page--;
++      await new Promise(r => setTimeout(r, 20000 * retries));
++      continue;
++    }
++    if (obj._err) { console.error(\`fetchPages HTTP \${obj.status}\`); all._truncated = true; all._errStatus = obj.status; break; }
++    retries = 0; // retry budget is per page, not per fetchPages call`;
++
++const taxSelectFind = `  const prevBkById = {};
++  (currentBksSync || []).forEach(b => { if (b && b.id != null) prevBkById[b.id] = b; });
++  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));
++  const { taxTargets, missingCount, refreshCount } = selectGrTaxTargets(bookingEvs, prevBkById);
++  log(\`Fetching Greek taxes for \${taxTargets.length}/\${bookingEvs.length} bookings (\${missingCount} missing in backlog, \${refreshCount} recent refresh, missing-first cap)…\`);
++  const grTaxMap = {}; const BATCH_SIZE = 20; let fetched = 0;
++  for (let i = 0; i < taxTargets.length; i += BATCH_SIZE) {
++    const chunk = taxTargets.slice(i, i + BATCH_SIZE);
++    await Promise.all(chunk.map(async ev => {
++      try {
++        const r = await fetch(\`\${BASE}/calendar-events/\${ev.id}/calendar-event-gr-taxes\`, { headers: hhH(apiKey) });
++        if (r.ok) grTaxMap[ev.id] = await r.json();
++      } catch(e) {}
++    }));
++    fetched += chunk.length;
++    if (fetched % 200 === 0 || fetched === taxTargets.length)
++      log(\`  Taxes: \${fetched}/\${taxTargets.length} — \${Object.keys(grTaxMap).length} with data\`);
++  }`;
++
++const taxSelectReplace = `  const prevBkById = {};
++  (currentBksSync || []).forEach(b => { if (b && b.id != null) prevBkById[b.id] = b; });
++  const { taxTargets, missingCount, refreshCount } = selectGrTaxTargets(bookingEvs, prevBkById, Date.now(), { full });
++  log(full
++    ? \`Full tax pull: \${taxTargets.length} paid bookings (\${missingCount} missing Greek tax). Hosthub calendar-events have no climate_tax — each stay is a separate GET.\`
++    : \`Fetching Greek taxes for \${taxTargets.length}/\${bookingEvs.length} bookings (\${missingCount} missing in backlog, \${refreshCount} recent refresh, missing-first cap)…\`);
++  const grTaxMap = {}; const BATCH_SIZE = full ? 10 : 20; let fetched = 0;
++  let taxRateLimited = false; let pagesTruncated = !!(globalEvs && globalEvs._truncated);
++  for (let i = 0; i < taxTargets.length; i += BATCH_SIZE) {
++    if (taxRateLimited) break;
++    const chunk = taxTargets.slice(i, i + BATCH_SIZE);
++    await Promise.all(chunk.map(async ev => {
++      try {
++        const r = await fetch(\`\${BASE}/calendar-events/\${ev.id}/calendar-event-gr-taxes\`, { headers: hhH(apiKey) });
++        if (r.status === 429) { taxRateLimited = true; return; }
++        if (r.ok) grTaxMap[ev.id] = await r.json();
++      } catch(e) {}
++    }));
++    fetched += chunk.length;
++    if (fetched % 200 === 0 || fetched === taxTargets.length || taxRateLimited)
++      log(\`  Taxes: \${Object.keys(grTaxMap).length} saved / \${fetched} attempted / \${taxTargets.length} targeted\${taxRateLimited ? ' — Hosthub 429, stopping this cycle' : ''}\`);
++    if (full && !taxRateLimited) await new Promise(r => setTimeout(r, 400));
++  }`;
++
++const reuseFind = `  // Reuse stored Greek tax fields for bookings we did not refetch this cycle.
++  bookings.forEach(b => {
++    if (grTaxMap[b.id]) return;
++    const prev = prevBkById[b.id];
++    if (!prev || !hasTaxData(prev)) return;
++    b.ct = prev.ct; b.bvPrevat = prev.bvPrevat; b.vat = prev.vat; b.at = prev.at;
++    b.nbv = prev.nbv; b.trHost = prev.trHost;
++  });
++
++  results.rentals  = rentals;
++  results.bookings = bookings;
++  log(\`Sync complete — \${rentals.length} properties, \${bookings.length} bookings\`, 'ok');
++  return results;
++}`;
++
++const reuseReplace = `  // Reuse stored Greek tax fields for bookings we did not refetch this cycle —
++  // including stored zeros. A failed gr-taxes GET must not persist ct=0.
++  applyStoredGrTaxes(bookings, prevBkById, grTaxMap);
++
++  const afterById = {};
++  bookings.forEach(b => { if (b && b.id != null) afterById[b.id] = b; });
++  const remaining = selectGrTaxTargets(bookingEvs, afterById, Date.now(), {}).missingCount;
++
++  results.rentals  = rentals;
++  results.bookings = bookings;
++  results.taxAttempted = taxTargets.length;
++  results.taxFetched = Object.keys(grTaxMap).length;
++  results.taxBacklog = remaining;
++  results.taxRateLimited = !!taxRateLimited;
++  results.pagesTruncated = !!pagesTruncated;
++  if (pagesTruncated) {
++    results.syncFailed = { reason: 'partial_booking_fetch', detail: 'Hosthub calendar-event pages truncated (rate limit or HTTP error)' };
++  } else if (taxRateLimited) {
++    results.syncFailed = { reason: 'tax_rate_limited', detail: 'Hosthub 429 on calendar-event-gr-taxes — taxes are a separate endpoint from the booking' };
++  } else if (full && remaining > 0) {
++    results.syncFailed = { reason: 'tax_backlog_remaining', detail: remaining + ' paid stays still missing Greek tax after the full pull' };
++  } else if (remaining > 500) {
++    results.syncFailed = { reason: 'tax_backlog', detail: remaining + ' paid stays missing Greek tax. Run a full pull of the database including taxes.' };
++  }
++  log(\`Sync complete — \${rentals.length} properties, \${bookings.length} bookings, \${results.taxFetched} taxes saved, \${remaining} tax backlog\${results.syncFailed ? ' [' + results.syncFailed.reason + ']' : ''}\`, results.syncFailed ? 'warn' : 'ok');
++  return results;
++}`;
++
++const persistFind = `  return Object.values(byName).filter(a => a.name);
++}
++
++// ── Auto-sync scheduler (every 15 minutes: :00, :15, :30, :45) ───────────────`;
++
++const persistReplace = `  return Object.values(byName).filter(a => a.name);
++}
++
++async function persistHosthubSync(result, started, source, onLog) {
++  if (!pool) return { persisted: false };
++  const existing = await pool.query("SELECT data FROM app_data WHERE key = 'main'").catch(() => ({ rows: [] }));
++  const current  = existing.rows[0]?.data || {};
++  const currentBksGuard = Array.isArray(current.bks) ? current.bks : [];
++  const startedIso = (started instanceof Date ? started : new Date(started || Date.now())).toISOString();
++  let nextBks = Array.isArray(result.bookings) ? result.bookings : [];
++  const log = onLog || (m => console.log(m));
++
++  if (currentBksGuard.length >= 500 && nextBks.length < currentBksGuard.length * 0.7) {
++    console.error(\`[\${source}-sync] ✗ got \${nextBks.length} bookings but DB holds \${currentBksGuard.length} — partial Hosthub fetch, keeping existing bookings\`);
++    result.syncFailed = result.syncFailed || { reason: 'partial_booking_fetch', detail: 'got ' + nextBks.length + ' vs DB ' + currentBksGuard.length };
++    result.pagesTruncated = true;
++    nextBks = mergeGrTaxIntoExisting(currentBksGuard, nextBks);
++  } else if (source !== 'full' && current.meta && current.meta.hosthubSyncFailed) {
++    log('hosthubSyncFailed is set — merging taxes into existing bookings, not replacing the list');
++    nextBks = mergeGrTaxIntoExisting(currentBksGuard, nextBks);
++  }
++
++  const cancelledCount = nextBks.filter(b => b && b.cancelled).length;
++  if (cancelledCount) log('  including ' + cancelledCount + ' cancelled-but-paid booking(s)');
++
++  const merged = {
++    ...current,
++    bks:  nextBks,
++    apts: mergeApts(current.apts || [], result.rentals || []),
++    exps: current.exps || [],
++    meta: hosthubSyncMetaPatch(current.meta || {}, result, startedIso, source),
++  };
++  await pool.query(
++    \`INSERT INTO app_data (key, data) VALUES ($1, $2::jsonb)
++     ON CONFLICT (key) DO UPDATE SET data = $2::jsonb, updated_at = NOW()\`,
++    ['main', JSON.stringify(merged)]
++  );
++  console.log(\`[\${source}-sync] ✓ Done — \${nextBks.length} bookings saved at \${startedIso}\`);
++  await saveSnapshot(pool, nextBks, result.rentals || []);
++  return { persisted: true, bookings: nextBks, meta: merged.meta };
++}
++
++// ── Auto-sync scheduler (every 15 minutes: :00, :15, :30, :45) ───────────────`;
++
++const autoSaveFind = `      const result = await runSync(apiKey, onLog);
++      if (!result.error && pool) {
++        const existing = await pool.query("SELECT data FROM app_data WHERE key = 'main'").catch(() => ({ rows: [] }));
++        const current  = existing.rows[0]?.data || {};
++        // Cancelled-but-paid bookings now flow through runSync's main pipeline
++        // (with the full gr-taxes pass), so no separate cancelled merge is needed.
++        const cancelledCount = result.bookings.filter(b => b.cancelled).length;
++        if (cancelledCount) onLog(\`  including \${cancelledCount} cancelled-but-paid booking(s) with tax data\`);
++
++        const currentBksGuard = Array.isArray(current.bks) ? current.bks : [];
++        let nextBks = result.bookings;
++        if (currentBksGuard.length >= 500 && nextBks.length < currentBksGuard.length * 0.7) {
++          console.error(\`[auto-sync] ✗ got \${nextBks.length} bookings but DB holds \${currentBksGuard.length} — partial Hosthub fetch, keeping existing bookings\`);
++          nextBks = currentBksGuard;
++        }
++        const merged   = {
++          ...current,
++          bks:  nextBks,
++          apts: mergeApts(current.apts || [], result.rentals),
++          exps: current.exps || [],
++          meta: { ...(current.meta || {}), lastAutoSync: started.toISOString(), lastSync: started.toISOString() },
++        };
++        await pool.query(
++          \`INSERT INTO app_data (key, data) VALUES ($1, $2::jsonb)
++           ON CONFLICT (key) DO UPDATE SET data = $2::jsonb, updated_at = NOW()\`,
++          ['main', JSON.stringify(merged)]
++        );
++        console.log(\`[auto-sync] ✓ Done — \${nextBks.length} bookings saved at \${started.toISOString()}\`);
++        await saveSnapshot(pool, nextBks, result.rentals);
++      } else if (result.error) {`;
++
++const autoSaveReplace = `      const result = await runSync(apiKey, onLog, { full: false });
++      if (!result.error && pool) {
++        await persistHosthubSync(result, started, 'auto', onLog);
++      } else if (result.error) {`;
++
++const httpFind = `app.post('/api/sync', async (req, res) => {
++  const { apiKey: clientKey } = req.body;
++  const apiKey = SERVER_API_KEY || clientKey || '';
++  if (!apiKey) return res.status(400).json({ error: 'Missing apiKey' });
++
++  res.setHeader('Content-Type', 'application/x-ndjson');
++  const writeLine = (obj) => { try { res.write(JSON.stringify(obj) + '\\n'); } catch(e) {} };
++
++  const onLog = (msg, type='info') => writeLine({ type, msg });
++
++  const result = await runSync(apiKey, onLog);
++  writeLine({ type: 'done', rentals: result.rentals, bookings: result.bookings, error: result.error });
++  res.end();
++});`;
++
++const httpReplace = `async function streamHosthubSync(req, res, forceFull) {
++  const body = req.body || {};
++  const apiKey = SERVER_API_KEY || body.apiKey || '';
++  if (!apiKey) return res.status(400).json({ error: 'Missing apiKey' });
++  const full = forceFull || !!body.full;
++
++  res.setHeader('Content-Type', 'application/x-ndjson');
++  const writeLine = (obj) => { try { res.write(JSON.stringify(obj) + '\\n'); } catch(e) {} };
++  const onLog = (msg, type='info') => writeLine({ type, msg });
++
++  const started = new Date();
++  const result = await runSync(apiKey, onLog, { full });
++  let persisted = false;
++  if (!result.error && pool) {
++    await persistHosthubSync(result, started, full ? 'full' : 'manual', onLog);
++    persisted = true;
++  }
++  writeLine({
++    type: 'done',
++    rentals: result.rentals,
++    bookings: result.bookings,
++    error: result.error,
++    persisted,
++    full: !!result.full,
++    syncFailed: result.syncFailed || null,
++    taxBacklog: result.taxBacklog || 0,
++    taxFetched: result.taxFetched || 0,
++  });
++  res.end();
++}
++
++app.post('/api/sync', async (req, res) => streamHosthubSync(req, res, false));
++
++// Manual recovery: pull every calendar event and every paid stay's Greek taxes
++// (climate tax / VAT / accommodation tax). Hosthub does not embed those fields
++// on the booking, so this is a separate N+1 pass. Sets/clears hosthubSyncFailed.
++app.post('/api/sync-full', async (req, res) => streamHosthubSync(req, res, true));`;
++
++const cfgFind = `app.get('/api/server-config', (req, res) => {
++  res.json({
++    hasServerKey: !!SERVER_API_KEY,
++    hasPassword:  !!APP_PASSWORD,
++    hasDatabase:  !!pool,
++  });
++});`;
++
++const cfgReplace = `app.get('/api/server-config', async (req, res) => {
++  let hosthubSyncFailed = false, hosthubSyncFailedReason = '', hosthubTaxBacklog = 0;
++  if (pool) {
++    try {
++      const dbRow = await pool.query("SELECT data FROM app_data WHERE key='main'");
++      const meta = (dbRow.rows[0] && dbRow.rows[0].data && dbRow.rows[0].data.meta) || {};
++      hosthubSyncFailed = !!meta.hosthubSyncFailed;
++      hosthubSyncFailedReason = meta.hosthubSyncFailedReason || '';
++      hosthubTaxBacklog = meta.hosthubTaxBacklog || 0;
++    } catch (e) {}
++  }
++  res.json({
++    hasServerKey: !!SERVER_API_KEY,
++    hasPassword:  !!APP_PASSWORD,
++    hasDatabase:  !!pool,
++    hosthubSyncFailed,
++    hosthubSyncFailedReason,
++    hosthubTaxBacklog,
++  });
++});`;
++
++const feBootFind = `    for (let cn = 2; cn <= 140; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */`;
++const feBootReplace = `    for (let cn = 2; cn <= 141; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */ /* cn <= 140 */`;
++
++const injectFind = `      'setTimeout(_go,800);})();' +
++      '\\n<\\/script>';`;
++
++const injectReplace = `      'setTimeout(_go,800);})();' +
++      '(function(){function _hhFailPaint(){fetch("/api/server-config").then(function(r){return r.json();}).then(function(cfg){if(!cfg||!cfg.hosthubSyncFailed)return;var sub=document.getElementById("sync-banner-status");if(sub)sub.textContent="Hosthub sync failed"+(cfg.hosthubSyncFailedReason?(" — "+cfg.hosthubSyncFailedReason):"")+". Pull the full database including taxes ("+(cfg.hosthubTaxBacklog||0)+" stays missing TAKK/VAT).";var btn=document.getElementById("sync-btn");if(btn)btn.innerHTML=\\'<i class="ti ti-refresh"></i> Pull full database (incl. taxes)\\';}).catch(function(){});}setTimeout(_hhFailPaint,1200);})();' +
++      '\\n<\\/script>';`;
++
++const patches = [
++  { note: 'Helpers: failed-run flag, tax reuse, full-pull target list', find: helpersFind, replace: helpersReplace, count: 1 },
++  { note: 'runSync accepts full-pull opts', find: runSyncFind, replace: runSyncReplace, count: 1 },
++  { note: 'fetchPages marks truncated page lists', find: fetchPagesFind, replace: fetchPagesReplace, count: 1 },
++  { note: 'Tax pass aborts on 429 and full-pulls every paid stay', find: taxSelectFind, replace: taxSelectReplace, count: 1 },
++  { note: 'Never persist tax zeros from a failed fetch; set hosthubSyncFailed', find: reuseFind, replace: reuseReplace, count: 1 },
++  { note: 'persistHosthubSync writes the failure flag and skips list replace while flagged', find: persistFind, replace: persistReplace, count: 1 },
++  { note: 'Auto-sync uses persistHosthubSync', find: autoSaveFind, replace: autoSaveReplace, count: 1 },
++  { note: 'POST /api/sync persists; POST /api/sync-full pulls all taxes', find: httpFind, replace: httpReplace, count: 1 },
++  { note: '/api/server-config exposes hosthubSyncFailed', find: cfgFind, replace: cfgReplace, count: 1 },
++  { note: 'FE bootstrap through patches-141', find: feBootFind, replace: feBootReplace, count: 1 },
++  { note: 'Inject failed-sync banner from server-config', find: injectFind, replace: injectReplace, count: 1 },
++];
++
++let out = src;
++for (const p of patches) {
++  const n = out.split(p.find).length - 1;
++  if (n !== p.count) throw new Error('anchor ' + p.note + ' found ' + n + 'x');
++  out = out.split(p.find).join(p.replace);
++}
++
++const spec = {
++  baseSha256: base,
++  expectedSha256: sha(out),
++  builtAt: '2026-08-27 Hosthub failed-run flag + full database pull including Greek taxes',
++  patches,
++  assertions: [
++    { has: 'function hosthubSyncMetaPatch(', note: 'failure-flag helper exists' },
++    { has: "app.post('/api/sync-full'", note: 'full pull endpoint exists' },
++    { has: 'hosthubSyncFailed', note: 'failed-run flag is persisted' },
++    { has: 'must not persist ct=0', note: 'failed tax fetch cannot write zeros' },
++    { has: 'cn <= 141', note: 'FE bootstrap includes 141' },
++  ],
++};
++
++fs.writeFileSync(path.join(root, 'srv', 'patches-108.json'), JSON.stringify(spec, null, 1) + '\n');
++console.log('wrote srv/patches-108.json');
++console.log('base', spec.baseSha256);
++console.log('expected', spec.expectedSha256);
++console.log('bytes', Buffer.byteLength(out));
++console.log('patches', patches.length);
+diff --git a/scripts/_build-hosthub-tax-backfill-patch.js b/scripts/_build-hosthub-tax-backfill-patch.js
+new file mode 100644
+index 0000000..42f958a
+--- /dev/null
++++ b/scripts/_build-hosthub-tax-backfill-patch.js
+@@ -0,0 +1,122 @@
++'use strict';
++/**
++ * SRV 107: Hosthub Greek-tax fetch prefers the wiped/missing backlog so climate
++ * tax (TAKK) drains across 15-minute cycles instead of starving behind future
++ * stays that already have tax data. Also resets fetchPages 429 retries per page.
++ * Run: node scripts/_build-hosthub-tax-backfill-patch.js
++ */
++const fs = require('fs');
++const path = require('path');
++const crypto = require('crypto');
++
++const root = path.resolve(__dirname, '..');
++const sha = (s) => crypto.createHash('sha256').update(s.replace(/\r\n/g, '\n')).digest('hex');
++
++function applySrv(stopAt) {
++  let src = fs.readFileSync(path.join(root, 'server.js'), 'utf8').replace(/\r\n/g, '\n');
++  for (let n = 1; ; n++) {
++    const name = n === 1 ? 'patches.json' : 'patches-' + n + '.json';
++    if (stopAt && name === stopAt) break;
++    const p = path.join(root, 'srv', name);
++    if (!fs.existsSync(p)) break;
++    const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
++    for (const patch of cfg.patches || []) {
++      const count = src.split(patch.find).length - 1;
++      if (count !== (patch.count || 1)) throw new Error('miss ' + name + ' :: ' + patch.note + ' x' + count);
++      src = src.split(patch.find).join(patch.replace);
++    }
++  }
++  return src;
++}
++
++const src = applySrv('patches-107.json');
++const base = sha(src);
++
++const helperFind = '// ── Core sync function (shared by HTTP endpoint + auto-scheduler) ─────────────\nasync function runSync(apiKey, onLog) {';
++const helperReplace = `function selectGrTaxTargets(bookingEvs, prevBkById, nowMs) {
++  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));
++  const money = v => (v && typeof v === 'object') ? (v.cents || 0) / 100 : (parseFloat(v || 0) || 0);
++  const paid = ev => (money(ev.total_price) || money(ev.guest_paid) || money(ev.total_reservation_price) || money(ev.booking_value)) > 0;
++  const taxCutoff = new Date((nowMs != null ? nowMs : Date.now()) - 90 * 86400 * 1000).toISOString().slice(0, 10);
++  const byDateDesc = (a, b) => String(b.date_to || '').localeCompare(String(a.date_to || ''));
++  const missing = (bookingEvs || []).filter(ev => paid(ev) && (!prevBkById[ev.id] || !hasTaxData(prevBkById[ev.id])));
++  const refresh = (bookingEvs || []).filter(ev => paid(ev) && prevBkById[ev.id] && hasTaxData(prevBkById[ev.id]) && String(ev.date_to || '') >= taxCutoff);
++  missing.sort(byDateDesc);
++  refresh.sort(byDateDesc);
++  // Missing-first: the 22 Aug rate-limit wipe left ct=0 on ~98% of stays. Sorting
++  // all 90-day bookings by date_to filled the 500 cap with future stays that
++  // already had tax, so the backlog never drained. Keep a small refresh slice
++  // for Hosthub revisions; spend the rest of the cap on zeros.
++  const refreshTake = refresh.slice(0, 50);
++  const missingTake = missing.slice(0, Math.max(0, 500 - refreshTake.length));
++  return { taxTargets: missingTake.concat(refreshTake), missingCount: missing.length, refreshCount: refresh.length };
++}
++
++// ── Core sync function (shared by HTTP endpoint + auto-scheduler) ─────────────
++async function runSync(apiKey, onLog) {`;
++
++const selectFind = `  const taxCutoff = new Date(Date.now() - 90 * 86400 * 1000).toISOString().slice(0, 10);
++  const needTax = bookingEvs.filter(ev => {
++    const prev = prevBkById[ev.id];
++    if (!prev || !hasTaxData(prev)) return true;
++    return String(ev.date_to || '') >= taxCutoff;
++  });
++  needTax.sort((a, b) => String(b.date_to || '').localeCompare(String(a.date_to || '')));
++  const taxTargets = needTax.slice(0, 500);
++  log(\`Fetching Greek taxes for \${taxTargets.length}/\${bookingEvs.length} bookings (rest reuse stored values)…\`);`;
++
++const selectReplace = `  const { taxTargets, missingCount, refreshCount } = selectGrTaxTargets(bookingEvs, prevBkById);
++  log(\`Fetching Greek taxes for \${taxTargets.length}/\${bookingEvs.length} bookings (\${missingCount} missing in backlog, \${refreshCount} recent refresh, missing-first cap)…\`);`;
++
++const retryFind = `    if (obj._err) { console.error(\`fetchPages HTTP \${obj.status}\`); break; }
++    const items = obj.data || [];`;
++const retryReplace = `    if (obj._err) { console.error(\`fetchPages HTTP \${obj.status}\`); break; }
++    retries = 0; // retry budget is per page, not per fetchPages call
++    const items = obj.data || [];`;
++
++const patches = [
++  {
++    note: 'selectGrTaxTargets prefers wiped/missing climate-tax stays',
++    find: helperFind,
++    replace: helperReplace,
++    count: 1,
++  },
++  {
++    note: 'Tax fetch uses missing-first cap instead of newest-checkout sort',
++    find: selectFind,
++    replace: selectReplace,
++    count: 1,
++  },
++  {
++    note: 'fetchPages 429 retry budget resets after each successful page',
++    find: retryFind,
++    replace: retryReplace,
++    count: 1,
++  },
++];
++
++let out = src;
++for (const p of patches) {
++  const n = out.split(p.find).length - 1;
++  if (n !== p.count) throw new Error('anchor ' + p.note + ' found ' + n + 'x');
++  out = out.split(p.find).join(p.replace);
++}
++
++const spec = {
++  baseSha256: base,
++  expectedSha256: sha(out),
++  builtAt: '2026-08-27 Hosthub tax fetch: missing-first cap so the TAKK backlog drains',
++  patches,
++  assertions: [
++    { has: 'function selectGrTaxTargets(', note: 'tax target helper exists' },
++    { has: 'missing-first cap', note: 'log names the missing-first policy' },
++    { has: 'retry budget is per page', note: '429 retries reset per page' },
++    { hasNot: 'const taxTargets = needTax.slice(0, 500);', note: 'starving newest-first slice is gone' },
++  ],
++};
++
++fs.writeFileSync(path.join(root, 'srv', 'patches-107.json'), JSON.stringify(spec, null, 1) + '\n');
++console.log('wrote srv/patches-107.json');
++console.log('base', spec.baseSha256);
++console.log('expected', spec.expectedSha256);
++console.log('bytes', Buffer.byteLength(out));
 diff --git a/srv/patches-101.json b/srv/patches-101.json
 index 2e305db..760d9c5 100644
 --- a/srv/patches-101.json
@@ -38,30 +875,504 @@ index 2e305db..760d9c5 100644
    },
    {
     "has": "retries++; page--;",
+diff --git a/srv/patches-107.json b/srv/patches-107.json
+new file mode 100644
+index 0000000..c4314df
+--- /dev/null
++++ b/srv/patches-107.json
+@@ -0,0 +1,43 @@
++{
++ "baseSha256": "8c6cb0d92049d3d9891862079e836f32c78432f7954004fd471608ba87b6176f",
++ "expectedSha256": "84a8d9ea500b525c0d6253e4530c3a458cc3473404359beeacf3afe167f13b4d",
++ "builtAt": "2026-08-27 Hosthub tax fetch: missing-first cap so the TAKK backlog drains",
++ "patches": [
++  {
++   "note": "selectGrTaxTargets prefers wiped/missing climate-tax stays",
++   "find": "// ── Core sync function (shared by HTTP endpoint + auto-scheduler) ─────────────\nasync function runSync(apiKey, onLog) {",
++   "replace": "function selectGrTaxTargets(bookingEvs, prevBkById, nowMs) {\n  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));\n  const money = v => (v && typeof v === 'object') ? (v.cents || 0) / 100 : (parseFloat(v || 0) || 0);\n  const paid = ev => (money(ev.total_price) || money(ev.guest_paid) || money(ev.total_reservation_price) || money(ev.booking_value)) > 0;\n  const taxCutoff = new Date((nowMs != null ? nowMs : Date.now()) - 90 * 86400 * 1000).toISOString().slice(0, 10);\n  const byDateDesc = (a, b) => String(b.date_to || '').localeCompare(String(a.date_to || ''));\n  const missing = (bookingEvs || []).filter(ev => paid(ev) && (!prevBkById[ev.id] || !hasTaxData(prevBkById[ev.id])));\n  const refresh = (bookingEvs || []).filter(ev => paid(ev) && prevBkById[ev.id] && hasTaxData(prevBkById[ev.id]) && String(ev.date_to || '') >= taxCutoff);\n  missing.sort(byDateDesc);\n  refresh.sort(byDateDesc);\n  // Missing-first: the 22 Aug rate-limit wipe left ct=0 on ~98% of stays. Sorting\n  // all 90-day bookings by date_to filled the 500 cap with future stays that\n  // already had tax, so the backlog never drained. Keep a small refresh slice\n  // for Hosthub revisions; spend the rest of the cap on zeros.\n  const refreshTake = refresh.slice(0, 50);\n  const missingTake = missing.slice(0, Math.max(0, 500 - refreshTake.length));\n  return { taxTargets: missingTake.concat(refreshTake), missingCount: missing.length, refreshCount: refresh.length };\n}\n\n// ── Core sync function (shared by HTTP endpoint + auto-scheduler) ─────────────\nasync function runSync(apiKey, onLog) {",
++   "count": 1
++  },
++  {
++   "note": "Tax fetch uses missing-first cap instead of newest-checkout sort",
++   "find": "  const taxCutoff = new Date(Date.now() - 90 * 86400 * 1000).toISOString().slice(0, 10);\n  const needTax = bookingEvs.filter(ev => {\n    const prev = prevBkById[ev.id];\n    if (!prev || !hasTaxData(prev)) return true;\n    return String(ev.date_to || '') >= taxCutoff;\n  });\n  needTax.sort((a, b) => String(b.date_to || '').localeCompare(String(a.date_to || '')));\n  const taxTargets = needTax.slice(0, 500);\n  log(`Fetching Greek taxes for ${taxTargets.length}/${bookingEvs.length} bookings (rest reuse stored values)…`);",
++   "replace": "  const { taxTargets, missingCount, refreshCount } = selectGrTaxTargets(bookingEvs, prevBkById);\n  log(`Fetching Greek taxes for ${taxTargets.length}/${bookingEvs.length} bookings (${missingCount} missing in backlog, ${refreshCount} recent refresh, missing-first cap)…`);",
++   "count": 1
++  },
++  {
++   "note": "fetchPages 429 retry budget resets after each successful page",
++   "find": "    if (obj._err) { console.error(`fetchPages HTTP ${obj.status}`); break; }\n    const items = obj.data || [];",
++   "replace": "    if (obj._err) { console.error(`fetchPages HTTP ${obj.status}`); break; }\n    retries = 0; // retry budget is per page, not per fetchPages call\n    const items = obj.data || [];",
++   "count": 1
++  }
++ ],
++ "assertions": [
++  {
++   "has": "function selectGrTaxTargets(",
++   "note": "tax target helper exists"
++  },
++  {
++   "has": "missing-first cap",
++   "note": "log names the missing-first policy"
++  },
++  {
++   "has": "retry budget is per page",
++   "note": "429 retries reset per page"
++  },
++  {
++   "hasNot": "const taxTargets = needTax.slice(0, 500);",
++   "note": "starving newest-first slice is gone"
++  }
++ ]
++}
+diff --git a/srv/patches-108.json b/srv/patches-108.json
+new file mode 100644
+index 0000000..abe39b3
+--- /dev/null
++++ b/srv/patches-108.json
+@@ -0,0 +1,95 @@
++{
++ "baseSha256": "84a8d9ea500b525c0d6253e4530c3a458cc3473404359beeacf3afe167f13b4d",
++ "expectedSha256": "731c82d87a86d2f3fdd815d0566abe65e12e5c12d10d1ba71c7e82b80ae70adf",
++ "builtAt": "2026-08-27 Hosthub failed-run flag + full database pull including Greek taxes",
++ "patches": [
++  {
++   "note": "Helpers: failed-run flag, tax reuse, full-pull target list",
++   "find": "function selectGrTaxTargets(bookingEvs, prevBkById, nowMs) {\n  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));\n  const money = v => (v && typeof v === 'object') ? (v.cents || 0) / 100 : (parseFloat(v || 0) || 0);\n  const paid = ev => (money(ev.total_price) || money(ev.guest_paid) || money(ev.total_reservation_price) || money(ev.booking_value)) > 0;\n  const taxCutoff = new Date((nowMs != null ? nowMs : Date.now()) - 90 * 86400 * 1000).toISOString().slice(0, 10);\n  const byDateDesc = (a, b) => String(b.date_to || '').localeCompare(String(a.date_to || ''));\n  const missing = (bookingEvs || []).filter(ev => paid(ev) && (!prevBkById[ev.id] || !hasTaxData(prevBkById[ev.id])));\n  const refresh = (bookingEvs || []).filter(ev => paid(ev) && prevBkById[ev.id] && hasTaxData(prevBkById[ev.id]) && String(ev.date_to || '') >= taxCutoff);\n  missing.sort(byDateDesc);\n  refresh.sort(byDateDesc);\n  // Missing-first: the 22 Aug rate-limit wipe left ct=0 on ~98% of stays. Sorting\n  // all 90-day bookings by date_to filled the 500 cap with future stays that\n  // already had tax, so the backlog never drained. Keep a small refresh slice\n  // for Hosthub revisions; spend the rest of the cap on zeros.\n  const refreshTake = refresh.slice(0, 50);\n  const missingTake = missing.slice(0, Math.max(0, 500 - refreshTake.length));\n  return { taxTargets: missingTake.concat(refreshTake), missingCount: missing.length, refreshCount: refresh.length };\n}",
++   "replace": "function hasStoredGrTax(b) {\n  return !!(b && (b.grTaxOk || (+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));\n}\n\nfunction applyStoredGrTaxes(bookings, prevBkById, grTaxMap) {\n  (bookings || []).forEach(b => {\n    if (!b) return;\n    if (grTaxMap && Object.prototype.hasOwnProperty.call(grTaxMap, b.id)) {\n      b.grTaxOk = true;\n      return;\n    }\n    const prev = prevBkById && prevBkById[b.id];\n    if (!prev) return;\n    // Always copy previous tax fields when this cycle did not fetch. Writing\n    // ct=0 because Hosthub 429'd the separate gr-taxes endpoint is what wiped TAKK.\n    b.ct = prev.ct; b.bvPrevat = prev.bvPrevat; b.vat = prev.vat; b.at = prev.at;\n    b.nbv = prev.nbv; b.trHost = prev.trHost;\n    if (prev.grTaxOk) b.grTaxOk = true;\n  });\n  return bookings;\n}\n\nfunction mergeGrTaxIntoExisting(existing, incoming) {\n  const byId = {};\n  (incoming || []).forEach(b => { if (b && b.id != null) byId[b.id] = b; });\n  return (existing || []).map(b => {\n    const n = byId[b.id];\n    if (!n || !hasStoredGrTax(n)) return b;\n    return Object.assign({}, b, {\n      ct: n.ct, vat: n.vat, at: n.at, bvPrevat: n.bvPrevat,\n      nbv: n.nbv, trHost: n.trHost, grTaxOk: n.grTaxOk || b.grTaxOk,\n    });\n  });\n}\n\nfunction hosthubSyncMetaPatch(meta, result, startedIso, source) {\n  const next = Object.assign({}, meta || {});\n  next.lastSync = startedIso;\n  if (source === 'auto') next.lastAutoSync = startedIso;\n  if (source === 'full') next.lastFullSync = startedIso;\n  next.hosthubBatchSync = {\n    source: source || 'sync',\n    full: !!result.full,\n    taxIncluded: (result.taxFetched || 0) > 0,\n    taxAttempted: result.taxAttempted || 0,\n    taxFetched: result.taxFetched || 0,\n    taxBacklog: result.taxBacklog || 0,\n    taxRateLimited: !!result.taxRateLimited,\n    pagesTruncated: !!result.pagesTruncated,\n    at: startedIso,\n  };\n  next.hosthubTaxBacklog = result.taxBacklog || 0;\n  if (result.syncFailed) {\n    next.hosthubSyncFailed = true;\n    next.hosthubSyncFailedAt = startedIso;\n    next.hosthubSyncFailedReason = result.syncFailed.reason;\n    next.hosthubSyncFailedDetail = result.syncFailed.detail || '';\n  } else if (!(result.taxBacklog > 0)) {\n    delete next.hosthubSyncFailed;\n    delete next.hosthubSyncFailedAt;\n    delete next.hosthubSyncFailedReason;\n    delete next.hosthubSyncFailedDetail;\n    next.lastSuccessfulSync = startedIso;\n    next.lastTaxSync = startedIso;\n  }\n  return next;\n}\n\nfunction selectGrTaxTargets(bookingEvs, prevBkById, nowMs, opts) {\n  const money = v => (v && typeof v === 'object') ? (v.cents || 0) / 100 : (parseFloat(v || 0) || 0);\n  const paid = ev => (money(ev.total_price) || money(ev.guest_paid) || money(ev.total_reservation_price) || money(ev.booking_value)) > 0;\n  const taxCutoff = new Date((nowMs != null ? nowMs : Date.now()) - 90 * 86400 * 1000).toISOString().slice(0, 10);\n  const byDateDesc = (a, b) => String(b.date_to || '').localeCompare(String(a.date_to || ''));\n  const missing = (bookingEvs || []).filter(ev => paid(ev) && (!prevBkById[ev.id] || !hasStoredGrTax(prevBkById[ev.id])));\n  const refresh = (bookingEvs || []).filter(ev => paid(ev) && prevBkById[ev.id] && hasStoredGrTax(prevBkById[ev.id]) && String(ev.date_to || '') >= taxCutoff);\n  missing.sort(byDateDesc);\n  refresh.sort(byDateDesc);\n  if (opts && opts.full) {\n    // Manual recovery: every paid stay, missing first, no 500 cap. Hosthub's\n    // calendar-event payload has no climate_tax — each stay is a separate GET.\n    return { taxTargets: missing.concat(refresh), missingCount: missing.length, refreshCount: refresh.length, full: true };\n  }\n  // Missing-first: the 22 Aug rate-limit wipe left ct=0 on ~98% of stays. Sorting\n  // all 90-day bookings by date_to filled the 500 cap with future stays that\n  // already had tax, so the backlog never drained. Keep a small refresh slice\n  // for Hosthub revisions; spend the rest of the cap on zeros.\n  const refreshTake = refresh.slice(0, 50);\n  const missingTake = missing.slice(0, Math.max(0, 500 - refreshTake.length));\n  return { taxTargets: missingTake.concat(refreshTake), missingCount: missing.length, refreshCount: refresh.length, full: false };\n}",
++   "count": 1
++  },
++  {
++   "note": "runSync accepts full-pull opts",
++   "find": "async function runSync(apiKey, onLog) {\n  const log  = (msg, type='info') => { onLog && onLog(msg, type); };\n  const results = { rentals: [], bookings: [], error: false };",
++   "replace": "async function runSync(apiKey, onLog, opts) {\n  opts = opts || {};\n  const full = !!opts.full;\n  const log  = (msg, type='info') => { onLog && onLog(msg, type); };\n  const results = { rentals: [], bookings: [], error: false, full };",
++   "count": 1
++  },
++  {
++   "note": "fetchPages marks truncated page lists",
++   "find": "    try { obj = await hhGet(url, key); } catch(e) { console.error('fetchPages:', e.message); break; }\n    if (obj._err && (obj.status === 429 || obj.status >= 500) && retries < 3) {\n      // Hosthub rate limit: wait for the window to reset, retry the same page.\n      retries++; page--;\n      await new Promise(r => setTimeout(r, 20000 * retries));\n      continue;\n    }\n    if (obj._err) { console.error(`fetchPages HTTP ${obj.status}`); break; }\n    retries = 0; // retry budget is per page, not per fetchPages call",
++   "replace": "    try { obj = await hhGet(url, key); } catch(e) {\n      console.error('fetchPages:', e.message);\n      all._truncated = true; all._errStatus = 0;\n      break;\n    }\n    if (obj._err && (obj.status === 429 || obj.status >= 500) && retries < 3) {\n      // Hosthub rate limit: wait for the window to reset, retry the same page.\n      retries++; page--;\n      await new Promise(r => setTimeout(r, 20000 * retries));\n      continue;\n    }\n    if (obj._err) { console.error(`fetchPages HTTP ${obj.status}`); all._truncated = true; all._errStatus = obj.status; break; }\n    retries = 0; // retry budget is per page, not per fetchPages call",
++   "count": 1
++  },
++  {
++   "note": "Tax pass aborts on 429 and full-pulls every paid stay",
++   "find": "  const prevBkById = {};\n  (currentBksSync || []).forEach(b => { if (b && b.id != null) prevBkById[b.id] = b; });\n  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));\n  const { taxTargets, missingCount, refreshCount } = selectGrTaxTargets(bookingEvs, prevBkById);\n  log(`Fetching Greek taxes for ${taxTargets.length}/${bookingEvs.length} bookings (${missingCount} missing in backlog, ${refreshCount} recent refresh, missing-first cap)…`);\n  const grTaxMap = {}; const BATCH_SIZE = 20; let fetched = 0;\n  for (let i = 0; i < taxTargets.length; i += BATCH_SIZE) {\n    const chunk = taxTargets.slice(i, i + BATCH_SIZE);\n    await Promise.all(chunk.map(async ev => {\n      try {\n        const r = await fetch(`${BASE}/calendar-events/${ev.id}/calendar-event-gr-taxes`, { headers: hhH(apiKey) });\n        if (r.ok) grTaxMap[ev.id] = await r.json();\n      } catch(e) {}\n    }));\n    fetched += chunk.length;\n    if (fetched % 200 === 0 || fetched === taxTargets.length)\n      log(`  Taxes: ${fetched}/${taxTargets.length} — ${Object.keys(grTaxMap).length} with data`);\n  }",
++   "replace": "  const prevBkById = {};\n  (currentBksSync || []).forEach(b => { if (b && b.id != null) prevBkById[b.id] = b; });\n  const { taxTargets, missingCount, refreshCount } = selectGrTaxTargets(bookingEvs, prevBkById, Date.now(), { full });\n  log(full\n    ? `Full tax pull: ${taxTargets.length} paid bookings (${missingCount} missing Greek tax). Hosthub calendar-events have no climate_tax — each stay is a separate GET.`\n    : `Fetching Greek taxes for ${taxTargets.length}/${bookingEvs.length} bookings (${missingCount} missing in backlog, ${refreshCount} recent refresh, missing-first cap)…`);\n  const grTaxMap = {}; const BATCH_SIZE = full ? 10 : 20; let fetched = 0;\n  let taxRateLimited = false; let pagesTruncated = !!(globalEvs && globalEvs._truncated);\n  for (let i = 0; i < taxTargets.length; i += BATCH_SIZE) {\n    if (taxRateLimited) break;\n    const chunk = taxTargets.slice(i, i + BATCH_SIZE);\n    await Promise.all(chunk.map(async ev => {\n      try {\n        const r = await fetch(`${BASE}/calendar-events/${ev.id}/calendar-event-gr-taxes`, { headers: hhH(apiKey) });\n        if (r.status === 429) { taxRateLimited = true; return; }\n        if (r.ok) grTaxMap[ev.id] = await r.json();\n      } catch(e) {}\n    }));\n    fetched += chunk.length;\n    if (fetched % 200 === 0 || fetched === taxTargets.length || taxRateLimited)\n      log(`  Taxes: ${Object.keys(grTaxMap).length} saved / ${fetched} attempted / ${taxTargets.length} targeted${taxRateLimited ? ' — Hosthub 429, stopping this cycle' : ''}`);\n    if (full && !taxRateLimited) await new Promise(r => setTimeout(r, 400));\n  }",
++   "count": 1
++  },
++  {
++   "note": "Never persist tax zeros from a failed fetch; set hosthubSyncFailed",
++   "find": "  // Reuse stored Greek tax fields for bookings we did not refetch this cycle.\n  bookings.forEach(b => {\n    if (grTaxMap[b.id]) return;\n    const prev = prevBkById[b.id];\n    if (!prev || !hasTaxData(prev)) return;\n    b.ct = prev.ct; b.bvPrevat = prev.bvPrevat; b.vat = prev.vat; b.at = prev.at;\n    b.nbv = prev.nbv; b.trHost = prev.trHost;\n  });\n\n  results.rentals  = rentals;\n  results.bookings = bookings;\n  log(`Sync complete — ${rentals.length} properties, ${bookings.length} bookings`, 'ok');\n  return results;\n}",
++   "replace": "  // Reuse stored Greek tax fields for bookings we did not refetch this cycle —\n  // including stored zeros. A failed gr-taxes GET must not persist ct=0.\n  applyStoredGrTaxes(bookings, prevBkById, grTaxMap);\n\n  const afterById = {};\n  bookings.forEach(b => { if (b && b.id != null) afterById[b.id] = b; });\n  const remaining = selectGrTaxTargets(bookingEvs, afterById, Date.now(), {}).missingCount;\n\n  results.rentals  = rentals;\n  results.bookings = bookings;\n  results.taxAttempted = taxTargets.length;\n  results.taxFetched = Object.keys(grTaxMap).length;\n  results.taxBacklog = remaining;\n  results.taxRateLimited = !!taxRateLimited;\n  results.pagesTruncated = !!pagesTruncated;\n  if (pagesTruncated) {\n    results.syncFailed = { reason: 'partial_booking_fetch', detail: 'Hosthub calendar-event pages truncated (rate limit or HTTP error)' };\n  } else if (taxRateLimited) {\n    results.syncFailed = { reason: 'tax_rate_limited', detail: 'Hosthub 429 on calendar-event-gr-taxes — taxes are a separate endpoint from the booking' };\n  } else if (full && remaining > 0) {\n    results.syncFailed = { reason: 'tax_backlog_remaining', detail: remaining + ' paid stays still missing Greek tax after the full pull' };\n  } else if (remaining > 500) {\n    results.syncFailed = { reason: 'tax_backlog', detail: remaining + ' paid stays missing Greek tax. Run a full pull of the database including taxes.' };\n  }\n  log(`Sync complete — ${rentals.length} properties, ${bookings.length} bookings, ${results.taxFetched} taxes saved, ${remaining} tax backlog${results.syncFailed ? ' [' + results.syncFailed.reason + ']' : ''}`, results.syncFailed ? 'warn' : 'ok');\n  return results;\n}",
++   "count": 1
++  },
++  {
++   "note": "persistHosthubSync writes the failure flag and skips list replace while flagged",
++   "find": "  return Object.values(byName).filter(a => a.name);\n}\n\n// ── Auto-sync scheduler (every 15 minutes: :00, :15, :30, :45) ───────────────",
++   "replace": "  return Object.values(byName).filter(a => a.name);\n}\n\nasync function persistHosthubSync(result, started, source, onLog) {\n  if (!pool) return { persisted: false };\n  const existing = await pool.query(\"SELECT data FROM app_data WHERE key = 'main'\").catch(() => ({ rows: [] }));\n  const current  = existing.rows[0]?.data || {};\n  const currentBksGuard = Array.isArray(current.bks) ? current.bks : [];\n  const startedIso = (started instanceof Date ? started : new Date(started || Date.now())).toISOString();\n  let nextBks = Array.isArray(result.bookings) ? result.bookings : [];\n  const log = onLog || (m => console.log(m));\n\n  if (currentBksGuard.length >= 500 && nextBks.length < currentBksGuard.length * 0.7) {\n    console.error(`[${source}-sync] ✗ got ${nextBks.length} bookings but DB holds ${currentBksGuard.length} — partial Hosthub fetch, keeping existing bookings`);\n    result.syncFailed = result.syncFailed || { reason: 'partial_booking_fetch', detail: 'got ' + nextBks.length + ' vs DB ' + currentBksGuard.length };\n    result.pagesTruncated = true;\n    nextBks = mergeGrTaxIntoExisting(currentBksGuard, nextBks);\n  } else if (source !== 'full' && current.meta && current.meta.hosthubSyncFailed) {\n    log('hosthubSyncFailed is set — merging taxes into existing bookings, not replacing the list');\n    nextBks = mergeGrTaxIntoExisting(currentBksGuard, nextBks);\n  }\n\n  const cancelledCount = nextBks.filter(b => b && b.cancelled).length;\n  if (cancelledCount) log('  including ' + cancelledCount + ' cancelled-but-paid booking(s)');\n\n  const merged = {\n    ...current,\n    bks:  nextBks,\n    apts: mergeApts(current.apts || [], result.rentals || []),\n    exps: current.exps || [],\n    meta: hosthubSyncMetaPatch(current.meta || {}, result, startedIso, source),\n  };\n  await pool.query(\n    `INSERT INTO app_data (key, data) VALUES ($1, $2::jsonb)\n     ON CONFLICT (key) DO UPDATE SET data = $2::jsonb, updated_at = NOW()`,\n    ['main', JSON.stringify(merged)]\n  );\n  console.log(`[${source}-sync] ✓ Done — ${nextBks.length} bookings saved at ${startedIso}`);\n  await saveSnapshot(pool, nextBks, result.rentals || []);\n  return { persisted: true, bookings: nextBks, meta: merged.meta };\n}\n\n// ── Auto-sync scheduler (every 15 minutes: :00, :15, :30, :45) ───────────────",
++   "count": 1
++  },
++  {
++   "note": "Auto-sync uses persistHosthubSync",
++   "find": "      const result = await runSync(apiKey, onLog);\n      if (!result.error && pool) {\n        const existing = await pool.query(\"SELECT data FROM app_data WHERE key = 'main'\").catch(() => ({ rows: [] }));\n        const current  = existing.rows[0]?.data || {};\n        // Cancelled-but-paid bookings now flow through runSync's main pipeline\n        // (with the full gr-taxes pass), so no separate cancelled merge is needed.\n        const cancelledCount = result.bookings.filter(b => b.cancelled).length;\n        if (cancelledCount) onLog(`  including ${cancelledCount} cancelled-but-paid booking(s) with tax data`);\n\n        const currentBksGuard = Array.isArray(current.bks) ? current.bks : [];\n        let nextBks = result.bookings;\n        if (currentBksGuard.length >= 500 && nextBks.length < currentBksGuard.length * 0.7) {\n          console.error(`[auto-sync] ✗ got ${nextBks.length} bookings but DB holds ${currentBksGuard.length} — partial Hosthub fetch, keeping existing bookings`);\n          nextBks = currentBksGuard;\n        }\n        const merged   = {\n          ...current,\n          bks:  nextBks,\n          apts: mergeApts(current.apts || [], result.rentals),\n          exps: current.exps || [],\n          meta: { ...(current.meta || {}), lastAutoSync: started.toISOString(), lastSync: started.toISOString() },\n        };\n        await pool.query(\n          `INSERT INTO app_data (key, data) VALUES ($1, $2::jsonb)\n           ON CONFLICT (key) DO UPDATE SET data = $2::jsonb, updated_at = NOW()`,\n          ['main', JSON.stringify(merged)]\n        );\n        console.log(`[auto-sync] ✓ Done — ${nextBks.length} bookings saved at ${started.toISOString()}`);\n        await saveSnapshot(pool, nextBks, result.rentals);\n      } else if (result.error) {",
++   "replace": "      const result = await runSync(apiKey, onLog, { full: false });\n      if (!result.error && pool) {\n        await persistHosthubSync(result, started, 'auto', onLog);\n      } else if (result.error) {",
++   "count": 1
++  },
++  {
++   "note": "POST /api/sync persists; POST /api/sync-full pulls all taxes",
++   "find": "app.post('/api/sync', async (req, res) => {\n  const { apiKey: clientKey } = req.body;\n  const apiKey = SERVER_API_KEY || clientKey || '';\n  if (!apiKey) return res.status(400).json({ error: 'Missing apiKey' });\n\n  res.setHeader('Content-Type', 'application/x-ndjson');\n  const writeLine = (obj) => { try { res.write(JSON.stringify(obj) + '\\n'); } catch(e) {} };\n\n  const onLog = (msg, type='info') => writeLine({ type, msg });\n\n  const result = await runSync(apiKey, onLog);\n  writeLine({ type: 'done', rentals: result.rentals, bookings: result.bookings, error: result.error });\n  res.end();\n});",
++   "replace": "async function streamHosthubSync(req, res, forceFull) {\n  const body = req.body || {};\n  const apiKey = SERVER_API_KEY || body.apiKey || '';\n  if (!apiKey) return res.status(400).json({ error: 'Missing apiKey' });\n  const full = forceFull || !!body.full;\n\n  res.setHeader('Content-Type', 'application/x-ndjson');\n  const writeLine = (obj) => { try { res.write(JSON.stringify(obj) + '\\n'); } catch(e) {} };\n  const onLog = (msg, type='info') => writeLine({ type, msg });\n\n  const started = new Date();\n  const result = await runSync(apiKey, onLog, { full });\n  let persisted = false;\n  if (!result.error && pool) {\n    await persistHosthubSync(result, started, full ? 'full' : 'manual', onLog);\n    persisted = true;\n  }\n  writeLine({\n    type: 'done',\n    rentals: result.rentals,\n    bookings: result.bookings,\n    error: result.error,\n    persisted,\n    full: !!result.full,\n    syncFailed: result.syncFailed || null,\n    taxBacklog: result.taxBacklog || 0,\n    taxFetched: result.taxFetched || 0,\n  });\n  res.end();\n}\n\napp.post('/api/sync', async (req, res) => streamHosthubSync(req, res, false));\n\n// Manual recovery: pull every calendar event and every paid stay's Greek taxes\n// (climate tax / VAT / accommodation tax). Hosthub does not embed those fields\n// on the booking, so this is a separate N+1 pass. Sets/clears hosthubSyncFailed.\napp.post('/api/sync-full', async (req, res) => streamHosthubSync(req, res, true));",
++   "count": 1
++  },
++  {
++   "note": "/api/server-config exposes hosthubSyncFailed",
++   "find": "app.get('/api/server-config', (req, res) => {\n  res.json({\n    hasServerKey: !!SERVER_API_KEY,\n    hasPassword:  !!APP_PASSWORD,\n    hasDatabase:  !!pool,\n  });\n});",
++   "replace": "app.get('/api/server-config', async (req, res) => {\n  let hosthubSyncFailed = false, hosthubSyncFailedReason = '', hosthubTaxBacklog = 0;\n  if (pool) {\n    try {\n      const dbRow = await pool.query(\"SELECT data FROM app_data WHERE key='main'\");\n      const meta = (dbRow.rows[0] && dbRow.rows[0].data && dbRow.rows[0].data.meta) || {};\n      hosthubSyncFailed = !!meta.hosthubSyncFailed;\n      hosthubSyncFailedReason = meta.hosthubSyncFailedReason || '';\n      hosthubTaxBacklog = meta.hosthubTaxBacklog || 0;\n    } catch (e) {}\n  }\n  res.json({\n    hasServerKey: !!SERVER_API_KEY,\n    hasPassword:  !!APP_PASSWORD,\n    hasDatabase:  !!pool,\n    hosthubSyncFailed,\n    hosthubSyncFailedReason,\n    hosthubTaxBacklog,\n  });\n});",
++   "count": 1
++  },
++  {
++   "note": "FE bootstrap through patches-141",
++   "find": "    for (let cn = 2; cn <= 140; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */",
++   "replace": "    for (let cn = 2; cn <= 141; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */ /* cn <= 140 */",
++   "count": 1
++  },
++  {
++   "note": "Inject failed-sync banner from server-config",
++   "find": "      'setTimeout(_go,800);})();' +\n      '\\n<\\/script>';",
++   "replace": "      'setTimeout(_go,800);})();' +\n      '(function(){function _hhFailPaint(){fetch(\"/api/server-config\").then(function(r){return r.json();}).then(function(cfg){if(!cfg||!cfg.hosthubSyncFailed)return;var sub=document.getElementById(\"sync-banner-status\");if(sub)sub.textContent=\"Hosthub sync failed\"+(cfg.hosthubSyncFailedReason?(\" — \"+cfg.hosthubSyncFailedReason):\"\")+\". Pull the full database including taxes (\"+(cfg.hosthubTaxBacklog||0)+\" stays missing TAKK/VAT).\";var btn=document.getElementById(\"sync-btn\");if(btn)btn.innerHTML=\\'<i class=\"ti ti-refresh\"></i> Pull full database (incl. taxes)\\';}).catch(function(){});}setTimeout(_hhFailPaint,1200);})();' +\n      '\\n<\\/script>';",
++   "count": 1
++  }
++ ],
++ "assertions": [
++  {
++   "has": "function hosthubSyncMetaPatch(",
++   "note": "failure-flag helper exists"
++  },
++  {
++   "has": "app.post('/api/sync-full'",
++   "note": "full pull endpoint exists"
++  },
++  {
++   "has": "hosthubSyncFailed",
++   "note": "failed-run flag is persisted"
++  },
++  {
++   "has": "must not persist ct=0",
++   "note": "failed tax fetch cannot write zeros"
++  },
++  {
++   "has": "cn <= 141",
++   "note": "FE bootstrap includes 141"
++  }
++ ]
++}
+diff --git a/tests/hosthub-sync-recovery.test.js b/tests/hosthub-sync-recovery.test.js
+new file mode 100644
+index 0000000..bd555b2
+--- /dev/null
++++ b/tests/hosthub-sync-recovery.test.js
+@@ -0,0 +1,151 @@
++'use strict';
++/**
++ * Hosthub sync recovery: failed-run flag, full tax pull, never persist zeros
++ * from a failed calendar-event-gr-taxes fetch. Mirrors SRV 108 helpers.
++ */
++const assert = require('assert');
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const root = path.resolve(__dirname, '..');
++
++function applySrv() {
++  let src = fs.readFileSync(path.join(root, 'server.js'), 'utf8').replace(/\r\n/g, '\n');
++  for (let n = 1; n <= 160; n++) {
++    const name = n === 1 ? 'patches.json' : 'patches-' + n + '.json';
++    const p = path.join(root, 'srv', name);
++    if (!fs.existsSync(p)) break;
++    const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
++    for (const patch of cfg.patches || []) {
++      const count = src.split(patch.find).length - 1;
++      assert.strictEqual(count, patch.count || 1, name + ' ' + patch.note);
++      src = src.split(patch.find).join(patch.replace);
++    }
++  }
++  return src;
++}
++
++function extractFn(source, name) {
++  const start = source.indexOf('function ' + name + '(');
++  assert(start >= 0, 'missing function ' + name);
++  const brace = source.indexOf('{', start);
++  let depth = 0;
++  for (let i = brace; i < source.length; i++) {
++    if (source[i] === '{') depth++;
++    else if (source[i] === '}') {
++      depth--;
++      if (depth === 0) return source.slice(start, i + 1);
++    }
++  }
++  throw new Error('unclosed function ' + name);
++}
++
++const srv = applySrv();
++new vm.Script(srv, { filename: 'server.effective.js' });
++const spec = JSON.parse(fs.readFileSync(path.join(root, 'srv', 'patches-108.json'), 'utf8'));
++assert.strictEqual(crypto.createHash('sha256').update(srv).digest('hex'), spec.expectedSha256, 'SRV 108 result hash');
++assert(srv.includes("app.post('/api/sync-full'"), 'full pull endpoint');
++assert(srv.includes('hosthubSyncFailed'), 'failed-run flag');
++assert(srv.includes('function applyStoredGrTaxes('), 'tax reuse helper');
++assert(srv.includes('cn <= 141'), 'FE 141 bootstrap');
++assert(!srv.includes('if (!prev || !hasTaxData(prev)) return;'), 'wipe-on-missing reuse is gone');
++
++const names = [
++  'hasStoredGrTax',
++  'applyStoredGrTaxes',
++  'mergeGrTaxIntoExisting',
++  'hosthubSyncMetaPatch',
++  'selectGrTaxTargets',
++];
++const bundle = names.map(n => extractFn(srv, n)).join('\n');
++const sandbox = {};
++vm.runInNewContext(bundle + '\n' + names.map(n => n + ' = ' + n + ';').join('\n'), sandbox);
++
++const paid = (id, dateTo) => ({
++  id,
++  date_to: dateTo,
++  guest_paid: { cents: 10000, currency: 'EUR' },
++});
++const now = Date.parse('2026-08-27T12:00:00Z');
++
++const evs = [];
++const prev = {};
++for (let i = 0; i < 200; i++) {
++  const id = 'future' + i;
++  evs.push(paid(id, '2026-09-' + String((i % 28) + 1).padStart(2, '0')));
++  prev[id] = { id, ct: 8, bvPrevat: 100, grTaxOk: true };
++}
++for (let i = 0; i < 600; i++) {
++  const id = 'wiped' + i;
++  evs.push(paid(id, '2026-08-' + String((i % 27) + 1).padStart(2, '0')));
++  prev[id] = { id, ct: 0, vat: 0, at: 0, bvPrevat: 0 };
++}
++
++const capped = sandbox.selectGrTaxTargets(evs, prev, now, { full: false });
++assert.ok(capped.taxTargets.length <= 500, 'healthy auto-sync stays capped');
++assert.strictEqual(capped.missingCount, 600);
++assert.strictEqual(capped.taxTargets.filter(e => String(e.id).startsWith('wiped')).length, 450);
++
++const full = sandbox.selectGrTaxTargets(evs, prev, now, { full: true });
++assert.strictEqual(full.taxTargets.length, 800, 'full pull takes every paid stay');
++assert.strictEqual(full.taxTargets.filter(e => String(e.id).startsWith('wiped')).length, 600, 'full pull includes the whole wiped backlog');
++assert.ok(full.taxTargets.slice(0, 600).every(e => String(e.id).startsWith('wiped')), 'full pull still does missing first');
++
++// Failed fetch must not write zeros over stored tax, and must keep wiped zeros
++// until a successful GET (so the next full pull still sees them as missing).
++const bookings = [
++  { id: 'kept', ct: 0, vat: 0, at: 0, bvPrevat: 0 },
++  { id: 'wiped1', ct: 0, vat: 0, at: 0, bvPrevat: 0 },
++  { id: 'fresh', ct: 0, vat: 0, at: 0, bvPrevat: 0 },
++];
++const prevBks = {
++  kept: { id: 'kept', ct: 64, vat: 10, at: 2, bvPrevat: 200, nbv: 124, trHost: 76, grTaxOk: true },
++  wiped1: { id: 'wiped1', ct: 0, vat: 0, at: 0, bvPrevat: 0 },
++};
++const grTaxMap = { fresh: { climate_tax: 8 } };
++sandbox.applyStoredGrTaxes(bookings, prevBks, grTaxMap);
++assert.strictEqual(bookings[0].ct, 64, 'unfetched stay keeps previous climate tax');
++assert.strictEqual(bookings[0].grTaxOk, true);
++assert.strictEqual(bookings[1].ct, 0, 'wiped stay stays 0 until a successful fetch');
++assert.ok(!bookings[1].grTaxOk, 'wiped stay is not marked fetched');
++assert.strictEqual(bookings[2].grTaxOk, true, 'successful fetch is marked even if mapping already wrote ct');
++
++const merged = sandbox.mergeGrTaxIntoExisting(
++  [{ id: 'a', ct: 0 }, { id: 'b', ct: 16, grTaxOk: true }],
++  [{ id: 'a', ct: 24, vat: 1, at: 0, bvPrevat: 80, nbv: 55, trHost: 25, grTaxOk: true }]
++);
++assert.strictEqual(merged[0].ct, 24, 'flagged auto-sync merges new taxes into existing rows');
++assert.strictEqual(merged[1].ct, 16, 'untouched rows stay');
++
++const flagged = sandbox.hosthubSyncMetaPatch({}, {
++  syncFailed: { reason: 'tax_rate_limited', detail: '429' },
++  taxBacklog: 5624,
++  taxFetched: 12,
++  taxAttempted: 500,
++  taxRateLimited: true,
++  full: false,
++}, '2026-08-27T20:00:00.000Z', 'auto');
++assert.strictEqual(flagged.hosthubSyncFailed, true);
++assert.strictEqual(flagged.hosthubSyncFailedReason, 'tax_rate_limited');
++assert.strictEqual(flagged.hosthubTaxBacklog, 5624);
++
++const cleared = sandbox.hosthubSyncMetaPatch(flagged, {
++  taxBacklog: 0,
++  taxFetched: 5624,
++  taxAttempted: 5624,
++  full: true,
++}, '2026-08-27T21:00:00.000Z', 'full');
++assert.ok(!cleared.hosthubSyncFailed, 'full pull with empty backlog clears the flag');
++assert.strictEqual(cleared.lastTaxSync, '2026-08-27T21:00:00.000Z');
++
++const keep = sandbox.hosthubSyncMetaPatch(flagged, {
++  taxBacklog: 5200,
++  taxFetched: 450,
++  full: false,
++}, '2026-08-27T20:15:00.000Z', 'auto');
++assert.strictEqual(keep.hosthubSyncFailed, true, 'capped cycle does not clear the flag while backlog remains');
++assert.strictEqual(keep.hosthubTaxBacklog, 5200);
++
++console.log('hosthub-sync-recovery OK: full pull', full.taxTargets.length, 'paid; flag', flagged.hosthubSyncFailedReason, '→ cleared', !cleared.hosthubSyncFailed);
+diff --git a/tests/hosthub-tax-targets.test.js b/tests/hosthub-tax-targets.test.js
+new file mode 100644
+index 0000000..ce821f9
+--- /dev/null
++++ b/tests/hosthub-tax-targets.test.js
+@@ -0,0 +1,128 @@
++'use strict';
++/**
++ * Hosthub Greek-tax target selection: missing/wiped stays fill the 500 cap
++ * before recent stays that already have tax data. Mirrors selectGrTaxTargets
++ * in srv/patches-107.json (full-pull / failed-run flag live in SRV 108).
++ */
++const assert = require('assert');
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const root = path.resolve(__dirname, '..');
++
++function applySrv() {
++  let src = fs.readFileSync(path.join(root, 'server.js'), 'utf8').replace(/\r\n/g, '\n');
++  for (let n = 1; n <= 160; n++) {
++    const name = n === 1 ? 'patches.json' : 'patches-' + n + '.json';
++    const p = path.join(root, 'srv', name);
++    if (!fs.existsSync(p)) break;
++    const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
++    for (const patch of cfg.patches || []) {
++      const count = src.split(patch.find).length - 1;
++      assert.strictEqual(count, patch.count || 1, name + ' ' + patch.note);
++      src = src.split(patch.find).join(patch.replace);
++    }
++  }
++  return src;
++}
++
++function extractFn(source, name) {
++  const start = source.indexOf('function ' + name + '(');
++  assert(start >= 0, 'missing function ' + name);
++  const brace = source.indexOf('{', start);
++  let depth = 0;
++  for (let i = brace; i < source.length; i++) {
++    if (source[i] === '{') depth++;
++    else if (source[i] === '}') {
++      depth--;
++      if (depth === 0) return source.slice(start, i + 1);
++    }
++  }
++  throw new Error('unclosed function ' + name);
++}
++
++const srv = applySrv();
++new vm.Script(srv, { filename: 'server.effective.js' });
++assert(srv.includes('function selectGrTaxTargets('), 'helper landed');
++assert(srv.includes('missing-first cap'), 'missing-first log landed');
++assert(srv.includes('retry budget is per page'), 'per-page 429 reset landed');
++assert(!srv.includes('const taxTargets = needTax.slice(0, 500);'), 'starving slice removed');
++
++const fn = extractFn(srv, 'hasStoredGrTax') + '\n' + extractFn(srv, 'selectGrTaxTargets');
++const sandbox = { selectGrTaxTargets: null, hasStoredGrTax: null };
++vm.runInNewContext(fn + '\nhasStoredGrTax = hasStoredGrTax;\nselectGrTaxTargets = selectGrTaxTargets;', sandbox);
++const select = sandbox.selectGrTaxTargets;
++
++const paid = (id, dateTo) => ({
++  id,
++  date_to: dateTo,
++  guest_paid: { cents: 10000, currency: 'EUR' },
++});
++const free = (id, dateTo) => ({ id, date_to: dateTo, guest_paid: { cents: 0, currency: 'EUR' } });
++const now = Date.parse('2026-08-27T12:00:00Z');
++
++// Reproduce the 22 Aug starvation: future already-taxed stays + unpaid
++// preparations (date_to in 2027) fill a newest-first 500 cap, so wiped
++// August revenue stays never get fetched.
++const evs = [];
++const prev = {};
++for (let i = 0; i < 200; i++) {
++  const id = 'future' + i;
++  evs.push(paid(id, '2026-09-' + String((i % 28) + 1).padStart(2, '0')));
++  prev[id] = { id, ct: 8, bvPrevat: 100 };
++}
++for (let i = 0; i < 400; i++) {
++  const id = 'wiped' + i;
++  evs.push(paid(id, '2026-08-' + String((i % 27) + 1).padStart(2, '0')));
++  prev[id] = { id, ct: 0, vat: 0, at: 0, bvPrevat: 0 };
++}
++for (let i = 0; i < 400; i++) evs.push(free('prep' + i, '2027-01-01'));
++
++const old = (() => {
++  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));
++  const taxCutoff = new Date(now - 90 * 86400 * 1000).toISOString().slice(0, 10);
++  const needTax = evs.filter(ev => {
++    const p = prev[ev.id];
++    if (!p || !hasTaxData(p)) return true;
++    return String(ev.date_to || '') >= taxCutoff;
++  });
++  needTax.sort((a, b) => String(b.date_to || '').localeCompare(String(a.date_to || '')));
++  return needTax.slice(0, 500);
++})();
++assert.strictEqual(old.filter(e => String(e.id).startsWith('wiped')).length, 0, 'old cap took zero wiped August stays');
++assert.strictEqual(old.filter(e => String(e.id).startsWith('prep')).length, 400, 'old cap spent 400 slots on unpaid 2027 preparations');
++assert.strictEqual(old.filter(e => String(e.id).startsWith('future')).length, 100, 'old cap filled the rest with already-taxed future stays');
++
++const { taxTargets, missingCount, refreshCount } = select(evs, prev, now);
++assert.strictEqual(missingCount, 400, '400 paid wiped stays are the backlog');
++assert.strictEqual(refreshCount, 200, '200 already-taxed recent stays are refresh-only');
++assert.ok(taxTargets.length <= 500, 'never exceeds the 500 cap');
++const wiped = taxTargets.filter(e => String(e.id).startsWith('wiped')).length;
++const future = taxTargets.filter(e => String(e.id).startsWith('future')).length;
++const preps = taxTargets.filter(e => String(e.id).startsWith('prep')).length;
++assert.strictEqual(preps, 0, '€0 preparations do not consume tax slots');
++assert.strictEqual(wiped, 400, 'missing-first fetches every wiped paid stay before idling');
++assert.strictEqual(future, 50, 'at most 50 slots refresh stays that already have tax');
++assert.ok(taxTargets.slice(0, 400).every(e => String(e.id).startsWith('wiped')), 'wiped stays are fetched first');
++
++// When the backlog is larger than the cap, still leave 50 refresh slots.
++const big = [];
++const bigPrev = {};
++for (let i = 0; i < 80; i++) {
++  const id = 'r' + i;
++  big.push(paid(id, '2026-09-10'));
++  bigPrev[id] = { id, ct: 16, bvPrevat: 80 };
++}
++for (let i = 0; i < 600; i++) {
++  const id = 'm' + i;
++  big.push(paid(id, '2026-07-15'));
++  bigPrev[id] = { id, ct: 0 };
++}
++const bigSel = select(big, bigPrev, now);
++assert.strictEqual(bigSel.taxTargets.length, 500, 'full cap when backlog is huge');
++assert.strictEqual(bigSel.taxTargets.filter(e => String(e.id).startsWith('m')).length, 450, '450 missing');
++assert.strictEqual(bigSel.taxTargets.filter(e => String(e.id).startsWith('r')).length, 50, '50 refresh');
++
++console.log('hosthub-tax-targets OK: missing-first sends', wiped, 'wiped +', future, 'refresh; old cap sent', old.filter(e => String(e.id).startsWith('wiped')).length, 'wiped');
+diff --git a/tests/monthly-close-patches.test.js b/tests/monthly-close-patches.test.js
+index 86468f8..1fff04b 100644
+--- a/tests/monthly-close-patches.test.js
++++ b/tests/monthly-close-patches.test.js
+@@ -14,7 +14,7 @@ let html = origHtml;
+ // Each file starts where the previous one ended, so a release is a small new
+ // file rather than a rewrite of one ever-growing patches.json.
+ const chainFiles = ['patches.json'];
+-for (let n = 2; n <= 140; n++) {
++for (let n = 2; n <= 160; n++) {
+   const f = path.join(root, 'fe', `patches-${n}.json`);
+   if (!fs.existsSync(f)) break;
+   chainFiles.push(`patches-${n}.json`);
+@@ -255,7 +255,7 @@ assert.strictEqual(stepCtx.S.moOverride['a1::2026-07-01::2026-07-31'], 2, 'a1 mo
+ 
+ // ── Server patches (srv/patches.json → server.js), mirroring srv-boot.js ─────
+ const srvChain = ['patches.json'];
+-for (let n = 2; n <= 140; n++) {
++for (let n = 2; n <= 160; n++) {
+   if (!fs.existsSync(path.join(root, 'srv', `patches-${n}.json`))) break;
+   srvChain.push(`patches-${n}.json`);
+ }
 diff --git a/tests/payments-check-votsala-group.test.js b/tests/payments-check-votsala-group.test.js
-index f850e81..f3a15d7 100644
+index f850e81..923fade 100644
 --- a/tests/payments-check-votsala-group.test.js
 +++ b/tests/payments-check-votsala-group.test.js
-@@ -53,7 +53,7 @@ function extractFn(source, name) {
+@@ -52,8 +52,8 @@ function extractFn(source, name) {
+ 
  const fe = applyKind('fe');
  const srv = applyKind('srv');
- assert.strictEqual(fe.last, 'patches-140.json', 'FE 140 is the tip of the chain');
+-assert.strictEqual(fe.last, 'patches-140.json', 'FE 140 is the tip of the chain');
 -assert.strictEqual(srv.last, 'patches-106.json', 'SRV 106 is the tip of the chain');
-+assert.strictEqual(srv.last, 'patches-107.json', 'SRV 107 is the tip of the chain');
++assert.strictEqual(fe.last, 'patches-141.json', 'FE 141 is the tip of the chain');
++assert.strictEqual(srv.last, 'patches-108.json', 'SRV 108 is the tip of the chain');
  assert(fe.src.includes('piRunAgent'), 'FE includes Platform Invoices agent');
  assert(srv.src.includes("app.post('/api/platform-invoices/agent'"), 'SRV includes Platform Invoices agent');
  assert(srv.src.includes("j.event === 'already_have'"), 'SRV tracks already_have');
 diff --git a/tests/platform-invoice-agent.test.js b/tests/platform-invoice-agent.test.js
-index fcd2f06..94ceb6b 100644
+index fcd2f06..f003047 100644
 --- a/tests/platform-invoice-agent.test.js
 +++ b/tests/platform-invoice-agent.test.js
-@@ -255,6 +255,9 @@ assert(srv105.patches.filter((p) => (p.replace || '').includes('resolvePull();')
+@@ -255,10 +255,18 @@ assert(srv105.patches.filter((p) => (p.replace || '').includes('resolvePull();')
  const srv106 = JSON.parse(fs.readFileSync(path.join(root, 'srv', 'patches-106.json'), 'utf8'));
  assert.strictEqual(srv106.baseSha256, srv105.expectedSha256, 'SRV 106 continues SRV 105');
  assert(srv106.patches.every((p) => (p.replace || '').includes("contentType: 'text/csv; charset=utf-8'")), 'SRV mails the sheet as text/csv');
 +const srv107 = JSON.parse(fs.readFileSync(path.join(root, 'srv', 'patches-107.json'), 'utf8'));
 +assert.strictEqual(srv107.baseSha256, srv106.expectedSha256, 'SRV 107 continues SRV 106');
 +assert(srv107.patches.some((p) => (p.replace || '').includes('function selectGrTaxTargets(')), 'SRV 107 prefers missing climate-tax stays');
++const srv108 = JSON.parse(fs.readFileSync(path.join(root, 'srv', 'patches-108.json'), 'utf8'));
++assert.strictEqual(srv108.baseSha256, srv107.expectedSha256, 'SRV 108 continues SRV 107');
  assert(srv105.patches.some((p) => (p.replace || '').includes('legacyKey')), 'SRV zip dedupe matches pre-hash filenames');
  const fe140 = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'patches-140.json'), 'utf8'));
  assert.strictEqual(fe140.baseSha256, fe139.expectedSha256, 'FE 140 continues FE 139');
+ assert(fe140.patches.some((p) => (p.replace || '').includes("replace(/</g, '&lt;')")), 'FE escapes the legacy accountant card title');
++const fe141 = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'patches-141.json'), 'utf8'));
++assert.strictEqual(fe141.baseSha256, fe140.expectedSha256, 'FE 141 continues FE 140');
++assert(fe141.patches.some((p) => (p.replace || '').includes('full: true')), 'FE 141 requests a full tax pull');
+ 
+ // Accountant cards refuse addresses nodemailer/emailAddrOk would refuse.
+ assert.strictEqual(accountants.normalizeCard({ email: 'not-an-email' }), null, 'invalid address rejected');

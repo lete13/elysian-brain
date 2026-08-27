@@ -2,7 +2,7 @@
 /**
  * Hosthub Greek-tax target selection: missing/wiped stays fill the 500 cap
  * before recent stays that already have tax data. Mirrors selectGrTaxTargets
- * in srv/patches-107.json.
+ * in srv/patches-107.json (full-pull / failed-run flag live in SRV 108).
  */
 const assert = require('assert');
 const crypto = require('crypto');
@@ -14,7 +14,7 @@ const root = path.resolve(__dirname, '..');
 
 function applySrv() {
   let src = fs.readFileSync(path.join(root, 'server.js'), 'utf8').replace(/\r\n/g, '\n');
-  for (let n = 1; n <= 140; n++) {
+  for (let n = 1; n <= 160; n++) {
     const name = n === 1 ? 'patches.json' : 'patches-' + n + '.json';
     const p = path.join(root, 'srv', name);
     if (!fs.existsSync(p)) break;
@@ -45,16 +45,14 @@ function extractFn(source, name) {
 
 const srv = applySrv();
 new vm.Script(srv, { filename: 'server.effective.js' });
-const spec = JSON.parse(fs.readFileSync(path.join(root, 'srv', 'patches-107.json'), 'utf8'));
-assert.strictEqual(crypto.createHash('sha256').update(srv).digest('hex'), spec.expectedSha256, 'SRV 107 result hash');
 assert(srv.includes('function selectGrTaxTargets('), 'helper landed');
 assert(srv.includes('missing-first cap'), 'missing-first log landed');
 assert(srv.includes('retry budget is per page'), 'per-page 429 reset landed');
 assert(!srv.includes('const taxTargets = needTax.slice(0, 500);'), 'starving slice removed');
 
-const fn = extractFn(srv, 'selectGrTaxTargets');
-const sandbox = { selectGrTaxTargets: null };
-vm.runInNewContext(fn + '\nselectGrTaxTargets = selectGrTaxTargets;', sandbox);
+const fn = extractFn(srv, 'hasStoredGrTax') + '\n' + extractFn(srv, 'selectGrTaxTargets');
+const sandbox = { selectGrTaxTargets: null, hasStoredGrTax: null };
+vm.runInNewContext(fn + '\nhasStoredGrTax = hasStoredGrTax;\nselectGrTaxTargets = selectGrTaxTargets;', sandbox);
 const select = sandbox.selectGrTaxTargets;
 
 const paid = (id, dateTo) => ({
