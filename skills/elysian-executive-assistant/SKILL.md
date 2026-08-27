@@ -24,7 +24,7 @@ If the project contains `claude/elysian-memory.md`, read it first — it's the s
 
 | Cadence | What happens |
 |---|---|
-| Every ~2 h | Hosthub sync into the app (bookings wholesale-replaced); daily server auto-sync too (`AUTO_SYNC_HOUR`) |
+| Every 15 min | Hosthub **rolling last-6-months + all future** sync (once `hosthub-6mo-sync` is on clearing); whole-database pull once a day at `AUTO_SYNC_HOUR` |
 | Every Thursday | Booking.com payouts land in Viva — one credit per property, covering checkouts Thu−7…Wed |
 | Rolling daily | Airbnb payouts (~24 h after each check-in, bank +1–3 business days) |
 | Saturday 08:00 | Viva auto-reconciliation cron (once Viva grants the API scope; manual until then) |

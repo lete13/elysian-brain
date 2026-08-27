@@ -53,7 +53,7 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 ### Wave 1 — by the 10th: clearing reports out, all apartments
 
 *Preconditions (do these before generating anything):*
-1. **Freshness** — recent Hosthub sync (~2 h cadence; ↻ Refresh forces one; server also runs a daily `AUTO_SYNC_HOUR` sync).
+1. **Freshness** — Hosthub auto-sync every 15 minutes is a **rolling last-6-months + all future** pull after `claude/hosthub-6mo-sync.md` ships; the **whole database** is pulled once a day at `AUTO_SYNC_HOUR` (default 04:00 server/UTC = 07:00 Athens — set `1` for ~04:00 Athens). ↻ Refresh is the rolling pull; dashboard **Full database** is the whole list. Until that patch is live on clearing, every 15-minute cycle still walks all ~6,000 events + 57 rentals.
 2. **Test suites green** (Imports → Run Tests): P1–P15, Mm1–Mm4, Pc1–Pc13. A red test before close is a stop sign. Known standing failure: **P4 on Votsala 2–8** (pending decision).
 3. **Expense allocation complete for the report month** (Runbook D) — sweep for unassigned chargeable expenses; anything unallocated is invisible in every report and silently under-charges owners. Attribution calls are Lefteris's.
 4. **Profile gaps** — unprofiled apartments are flagged in the tab and break TAKK/invoice scoping; profiles get set in Configuration first.

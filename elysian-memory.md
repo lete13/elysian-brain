@@ -17,7 +17,7 @@ Purpose: the single source of truth about Elysian for any Claude session. Keep t
 - **External accountant**: **E-New Generation** — files the monthly VAT return (fully out of Elysian's checklist scope) and receives Elysian's platform invoices monthly (§6).
 - **Portfolio: 57 apartments** — 27 leased 🏢 · 16 B2B 🤝 · 14 private 🏠 (live pull, 27 Jul 2026). Clusters: Athens metro (incl. Piraeus, Cholargos, Zografou, Nea Smyrni, Tavros, Psychiko), **Thessaloniki operation: 8 units** (launched Apr 2026 with 5) — Cornerstone, Hightower, Le Alex, Le Floor, Le Grace, Le Plaza, The Skarlatos residence, plus **ARITI 7 in Halkidiki (a sub-area of the Thessaloniki operation)**. Remaining regional units (Kefalonia, Lesbos, Corinthia, Lavrio, Porto Rafti) are **individual units under the normal model** — no separate segment.
 - **Channels**: Airbnb, Booking.com, and **direct** (including Elysian's own direct websites). No other OTAs — Payments Check's Airbnb+BDC scope is complete. Watch-item: if a direct site ever takes *online* payments, those credits fall outside the Payments Check model.
-- **Channel manager / PMS: Hosthub** — syncs ~every 2 hours; ↻ Refresh in Payments Check forces one. Server also has a daily `AUTO_SYNC_HOUR` cron.
+- **Channel manager / PMS: Hosthub** — auto-sync every 15 minutes. After `claude/hosthub-6mo-sync.md` ships: regular cycles pull the last 6 months **plus all future stays** and merge; the whole database is pulled once a day at `AUTO_SYNC_HOUR`. Until then every cycle still walks ~6,000 events + 57 rentals. ↻ Refresh forces a rolling pull; **Full database** is the nightly job on demand.
 - **Bank: Viva** business account — all Booking.com and Airbnb payouts in; **owner remittances out as one manual transfer per owner** after their report.
 - **The app**: *Elysian Clearing Automation* — custom operational backbone (§3).
 
@@ -311,6 +311,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **27 Aug 2026 (factual)** — Hosthub auto-sync is every **15 minutes**, not ~2 h (that was the product copy; the scheduler is `:00/:15/:30/:45`). Pending drop-in `claude/hosthub-6mo-sync.md`: regular cycles pull last 6 months + next 6 of future stays; whole database once a day at `AUTO_SYNC_HOUR`. Source: `scheduleAutoSync` on clearing `main`; live corpus ~6,000 events (PR #164).
 - **v1.4 (15 Aug 2026)** — Platform Invoices Airbnb pull **live** (new-tab `www.airbnb.gr` capture; archive by **VAT issue date**, not Hosthub `created`/`cancelledAt`; Hosthub codes; Excel ship). Two-code test saved real AIUC PDFs (job `ppmsuw193wm05or`). Booking.com parked. `USERS_JSON` confirmed on Railway. Platform Invoices is a primary Accounting/Admin tab. Daily Ops Beta UI and Personnel remain as of 8 Aug. Doc: `claude/platform-invoices-feature.md`. Source: live Collect 15 Aug 2026; Lefteris dating rule; clearing `main` `db13617` / `5eff0da`.
 - **13 Aug 2026** — Platform invoices: **Airbnb = Hosthub `reservationId` → confirmation-code pull** (VAT Invoicer-style); Booking.com pull parked for now. Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices: **pull-first automation** (DB portal sessions, multi-property Booking pull, upload emergency-only). Doc: `claude/platform-invoices-feature.md`.
