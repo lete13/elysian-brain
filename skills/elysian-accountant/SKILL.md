@@ -146,6 +146,8 @@ Mechanics: `select_browser` requires the **full device UUID**; JS returns trunca
 
 **Acting**: read freely; click/tick/save only on an explicit request for that specific action (ground rule 3). For any write that saves config: **pause the 60 s poll → fetch a fresh server snapshot → mutate → save → re-fetch to confirm persistence.** Skipping a step has silently lost changes before.
 
+**Stale-client saves (14 Aug 2026).** Every tab POSTs the full `S` blob. A Daily Ops tab that has not polled can overwrite Configuration (owner emails, clearing groups, Business tax) — that is what blanked Michalakopoulou. PR #94 restores *blank* fields; it cannot stop an older non-blank value from winning. Until SRV 107 / FE 141 (generation token `_baseSavedAt`) is live on clearing: hard-refresh every open tab after a config save, and do not leave Daily Ops running unattended. After it ships: a 409 “Stale client” means reload, never force-write. See `claude/stale-save-guard.md`.
+
 ## Making changes safely
 
 - **Files**: copy/edit under `/mnt/user-data/outputs/elysian-clearing/`, present; Lefteris pushes.
