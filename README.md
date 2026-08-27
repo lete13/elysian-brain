@@ -15,6 +15,7 @@ Private knowledge base — the canonical home of Elysian's memory document, feat
 - `claude/` — feature docs for the Elysian Clearing app
   - `platform-invoices-feature.md` — Airbnb/Booking.com host-portal invoices → accountants (≠ Oxygen)
   - `monthly-close-and-oxygen.md` — Monthly Close + Oxygen owner documents
+  - `hosthub-tax-backfill.md` — SRV 108 / FE 141: failed-run flag + full Hosthub pull including Greek taxes (TAKK) after the 22 Aug wipe
   - `stale-save-guard.md` — stop a stale browser tab overwriting Configuration (14 Aug class)
 - `skills/` — sources for the Claude skills (`elysian-accountant`, `elysian-executive-assistant`)
 

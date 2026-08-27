@@ -28,7 +28,7 @@ Exact hunks: `tests-hunks.md`. Also in clearing (small edits, not in the JSON ch
 3. `tests/payments-check-votsala-group.test.js` — tip asserts: FE `patches-141.json`, SRV `patches-107.json`.
 4. `tests/platform-invoice-agent.test.js` — SRV 107 continues 106; FE 141 continues 140.
 
-**Chain collision:** [brain PR #16](https://github.com/lete13/elysian-brain/pull/16) (Hosthub tax backfill) is also a drop-in for **FE 141**, plus SRV 108. Clearing `main` still ends at SRV 106 / FE 140, so this guard can land first as 107 / 141. If #16 is applied first, run `node scripts/_build-stale-save-guard.js` from the clearing root and ship as SRV 109 / FE 142. If this lands first, #16 must rebuild FE as 142.
+**Chain collision:** Hosthub tax backfill is now on brain `main` ([PR #16](https://github.com/lete13/elysian-brain/pull/16)) as a drop-in for **SRV 107+108 / FE 141**. Clearing `main` still ends at SRV 106 / FE 140. If tax-backfill is applied to clearing first, run `node scripts/_build-stale-save-guard.js` from the clearing root and ship this guard as SRV 109 / FE 142. If this lands first as 107 / 141, tax-backfill must rebuild FE as 142.
 
 Verified on clearing `main` at `e13e6ea` (accountant CSV): `npm test` green, including the new stale-write cases.
 
