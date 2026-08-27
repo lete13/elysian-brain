@@ -1,0 +1,67 @@
+commit 6863fc51ca95dc0db99e8ddff7708ce8ddda5b20
+Author: Cursor Agent <cursoragent@cursor.com>
+Date:   Thu Aug 27 20:00:14 2026 +0000
+
+    Prefer missing Hosthub climate-tax stays when filling the 500-per-cycle cap.
+    
+    The 22 Aug rate-limit wipe left ct=0 on almost every booking. SRV 101 then
+    sorted all 90-day events by checkout date, so future stays and unpaid
+    preparations filled the cap and the backlog never drained. Fetch missing
+    paid stays first, keep a 50-slot refresh, and reset fetchPages 429 retries
+    per page.
+
+diff --git a/package.json b/package.json
+index e42c9b9..4f6ff52 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,7 @@
+   "scripts": {
+     "start": "node srv-boot.js",
+     "dev": "node srv-boot.js",
+-    "test": "node tests/monthly-close-patches.test.js && node tests/home-viewing-appointments.test.js && node tests/airbnb-auth-flow.test.js && node tests/daily-ops-checkin-schedule.test.js && node tests/platform-invoice-booking-block.test.js && node tests/keys-hubs.test.js && node tests/payments-check-votsala-group.test.js",
++    "test": "node tests/monthly-close-patches.test.js && node tests/home-viewing-appointments.test.js && node tests/airbnb-auth-flow.test.js && node tests/daily-ops-checkin-schedule.test.js && node tests/platform-invoice-booking-block.test.js && node tests/keys-hubs.test.js && node tests/payments-check-votsala-group.test.js && node tests/hosthub-tax-targets.test.js",
+     "pull:platform-invoices": "node scripts/platform-invoice-pull.js",
+     "postinstall": "test \"$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD\" = \"1\" || npx playwright install chromium || true",
+     "test:platform-invoices": "node tests/platform-invoice-airbnb-codes.test.js && node tests/platform-invoice-stay-click.test.js && node tests/platform-invoice-vault-folders.test.js && node tests/platform-invoice-pull-midfail.test.js && node tests/platform-invoice-booking.test.js && node tests/platform-invoice-vault-view.test.js && node tests/platform-invoice-booking-block.test.js && node tests/platform-invoice-agent.test.js"
+diff --git a/srv/patches-101.json b/srv/patches-101.json
+index 2e305db..760d9c5 100644
+--- a/srv/patches-101.json
++++ b/srv/patches-101.json
+@@ -52,8 +52,8 @@
+    "note": "anti-wipe guard"
+   },
+   {
+-   "has": "const taxTargets = needTax.slice(0, 500);",
+-   "note": "tax fetch cap"
++   "has": "Fetching Greek taxes for",
++   "note": "tax fetch still capped (missing-first as of SRV 107)"
+   },
+   {
+    "has": "retries++; page--;",
+diff --git a/tests/payments-check-votsala-group.test.js b/tests/payments-check-votsala-group.test.js
+index f850e81..f3a15d7 100644
+--- a/tests/payments-check-votsala-group.test.js
++++ b/tests/payments-check-votsala-group.test.js
+@@ -53,7 +53,7 @@ function extractFn(source, name) {
+ const fe = applyKind('fe');
+ const srv = applyKind('srv');
+ assert.strictEqual(fe.last, 'patches-140.json', 'FE 140 is the tip of the chain');
+-assert.strictEqual(srv.last, 'patches-106.json', 'SRV 106 is the tip of the chain');
++assert.strictEqual(srv.last, 'patches-107.json', 'SRV 107 is the tip of the chain');
+ assert(fe.src.includes('piRunAgent'), 'FE includes Platform Invoices agent');
+ assert(srv.src.includes("app.post('/api/platform-invoices/agent'"), 'SRV includes Platform Invoices agent');
+ assert(srv.src.includes("j.event === 'already_have'"), 'SRV tracks already_have');
+diff --git a/tests/platform-invoice-agent.test.js b/tests/platform-invoice-agent.test.js
+index fcd2f06..94ceb6b 100644
+--- a/tests/platform-invoice-agent.test.js
++++ b/tests/platform-invoice-agent.test.js
+@@ -255,6 +255,9 @@ assert(srv105.patches.filter((p) => (p.replace || '').includes('resolvePull();')
+ const srv106 = JSON.parse(fs.readFileSync(path.join(root, 'srv', 'patches-106.json'), 'utf8'));
+ assert.strictEqual(srv106.baseSha256, srv105.expectedSha256, 'SRV 106 continues SRV 105');
+ assert(srv106.patches.every((p) => (p.replace || '').includes("contentType: 'text/csv; charset=utf-8'")), 'SRV mails the sheet as text/csv');
++const srv107 = JSON.parse(fs.readFileSync(path.join(root, 'srv', 'patches-107.json'), 'utf8'));
++assert.strictEqual(srv107.baseSha256, srv106.expectedSha256, 'SRV 107 continues SRV 106');
++assert(srv107.patches.some((p) => (p.replace || '').includes('function selectGrTaxTargets(')), 'SRV 107 prefers missing climate-tax stays');
+ assert(srv105.patches.some((p) => (p.replace || '').includes('legacyKey')), 'SRV zip dedupe matches pre-hash filenames');
+ const fe140 = JSON.parse(fs.readFileSync(path.join(root, 'fe', 'patches-140.json'), 'utf8'));
+ assert.strictEqual(fe140.baseSha256, fe139.expectedSha256, 'FE 140 continues FE 139');
