@@ -1,0 +1,71 @@
+{
+ "baseSha256": "ba001e33b4dbec39b6ef14d767f8aafe5b95ad4bfcb00bafbeea97c9d080abfd",
+ "expectedSha256": "9c31eff41a1d419efcf446e29bec2389d105fd8902749c97c2d3705c343c330c",
+ "builtAt": "2026-08-27 Full Hosthub pull including taxes + failed-sync banner",
+ "patches": [
+  {
+   "note": "Dashboard button pulls the full database including taxes",
+   "find": "        <i class=\"ti ti-refresh\"></i> Sync all bookings",
+   "replace": "        <i class=\"ti ti-refresh\"></i> Pull full database (incl. taxes)",
+   "count": 1
+  },
+  {
+   "note": "Banner copy names the full tax pull",
+   "find": "        <div id=\"sync-banner-status\" style=\"font-size:12px;color:rgba(201,168,76,.7);margin-top:3px\">Pull all bookings directly from your Hosthub account</div>",
+   "replace": "        <div id=\"sync-banner-status\" style=\"font-size:12px;color:rgba(201,168,76,.7);margin-top:3px\">Pull every booking and its Greek taxes (TAKK / VAT / accommodation) from Hosthub</div>",
+   "count": 1
+  },
+  {
+   "note": "initSyncUI surfaces hosthubSyncFailed",
+   "find": "    if (last) sub.textContent = `Last synced: ${new Date(last).toLocaleString('el-GR')}`;\n    else sub.textContent = 'API key configured — click to sync all bookings';",
+   "replace": "    if (S.meta && S.meta.hosthubSyncFailed) {\n      sub.textContent = 'Hosthub sync failed' + (S.meta.hosthubSyncFailedReason ? (' — ' + S.meta.hosthubSyncFailedReason) : '') + '. Pull the full database including taxes (' + (S.meta.hosthubTaxBacklog || 0) + ' stays missing).';\n    } else if (last) sub.textContent = `Last synced: ${new Date(last).toLocaleString('el-GR')}`;\n    else sub.textContent = 'API key configured — pull the full database including taxes';",
+   "count": 1
+  },
+  {
+   "note": "Manual sync requests a full tax pull",
+   "find": "      body: JSON.stringify({\n        apiKey: key,\n        rentalsEndpoint:  rentalsResult?.url || null,\n        bookingsEndpoint: bookingsResult?.url || null,\n      })",
+   "replace": "      body: JSON.stringify({\n        apiKey: key,\n        full: true,\n        rentalsEndpoint:  rentalsResult?.url || null,\n        bookingsEndpoint: bookingsResult?.url || null,\n      })",
+   "count": 1
+  },
+  {
+   "note": "Keep Hosthub event ids so tax reuse can match later syncs",
+   "find": "        id:    gid(),                  // fresh local ID",
+   "replace": "        id:    b.id || gid(),          // Hosthub event id — gid() broke tax reuse",
+   "count": 1
+  },
+  {
+   "note": "Reload from DB after the server persists a full pull",
+   "find": "    if (!finalData) throw new Error('Sync stream ended without data. Check the server console for errors.');\n\n    syncProgress(95);\n    syncLog(`\\nProcessing ${finalData.bookings.length} bookings…`, 'warn');\n\n    // Import data into state\n    const prevApts = S.apts.length;\n    S.bks = [];",
+   "replace": "    if (!finalData) throw new Error('Sync stream ended without data. Check the server console for errors.');\n\n    syncProgress(95);\n    const prevApts = S.apts.length;\n    if (finalData.persisted) {\n      syncLog('\\nServer saved the full pull (incl. taxes). Reloading from the database…', 'ok');\n      _dataInitialized = false;\n      await loadFromDb();\n      if (typeof initSyncUI === 'function') initSyncUI();\n    } else {\n    syncLog(`\\nProcessing ${finalData.bookings.length} bookings…`, 'warn');\n\n    // Import data into state\n    S.bks = [];",
+   "count": 1
+  },
+  {
+   "note": "Close the non-persisted client import branch",
+   "find": "      if (_locFilled) syncLog(`Location data added for ${_locFilled} properties (auto-categorization).`, 'ok');\n    }\n\n\n    const nNew = S.apts.length - prevApts;",
+   "replace": "      if (_locFilled) syncLog(`Location data added for ${_locFilled} properties (auto-categorization).`, 'ok');\n    }\n    } // else: client-side import when the server did not persist\n\n\n    const nNew = S.apts.length - prevApts;",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "Pull full database (incl. taxes)",
+   "note": "dashboard button is the full tax pull"
+  },
+  {
+   "has": "full: true",
+   "note": "manual sync asks the server for every paid stay's taxes"
+  },
+  {
+   "has": "hosthubSyncFailed",
+   "note": "banner reads the failed-run flag"
+  },
+  {
+   "has": "b.id || gid()",
+   "note": "Hosthub event ids are kept"
+  },
+  {
+   "has": "finalData.persisted",
+   "note": "client reloads the server-persisted pull"
+  }
+ ]
+}

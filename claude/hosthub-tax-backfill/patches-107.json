@@ -1,0 +1,43 @@
+{
+ "baseSha256": "8c6cb0d92049d3d9891862079e836f32c78432f7954004fd471608ba87b6176f",
+ "expectedSha256": "84a8d9ea500b525c0d6253e4530c3a458cc3473404359beeacf3afe167f13b4d",
+ "builtAt": "2026-08-27 Hosthub tax fetch: missing-first cap so the TAKK backlog drains",
+ "patches": [
+  {
+   "note": "selectGrTaxTargets prefers wiped/missing climate-tax stays",
+   "find": "// ── Core sync function (shared by HTTP endpoint + auto-scheduler) ─────────────\nasync function runSync(apiKey, onLog) {",
+   "replace": "function selectGrTaxTargets(bookingEvs, prevBkById, nowMs) {\n  const hasTaxData = b => !!(b && ((+b.ct || 0) || (+b.vat || 0) || (+b.at || 0) || (+b.bvPrevat || 0)));\n  const money = v => (v && typeof v === 'object') ? (v.cents || 0) / 100 : (parseFloat(v || 0) || 0);\n  const paid = ev => (money(ev.total_price) || money(ev.guest_paid) || money(ev.total_reservation_price) || money(ev.booking_value)) > 0;\n  const taxCutoff = new Date((nowMs != null ? nowMs : Date.now()) - 90 * 86400 * 1000).toISOString().slice(0, 10);\n  const byDateDesc = (a, b) => String(b.date_to || '').localeCompare(String(a.date_to || ''));\n  const missing = (bookingEvs || []).filter(ev => paid(ev) && (!prevBkById[ev.id] || !hasTaxData(prevBkById[ev.id])));\n  const refresh = (bookingEvs || []).filter(ev => paid(ev) && prevBkById[ev.id] && hasTaxData(prevBkById[ev.id]) && String(ev.date_to || '') >= taxCutoff);\n  missing.sort(byDateDesc);\n  refresh.sort(byDateDesc);\n  // Missing-first: the 22 Aug rate-limit wipe left ct=0 on ~98% of stays. Sorting\n  // all 90-day bookings by date_to filled the 500 cap with future stays that\n  // already had tax, so the backlog never drained. Keep a small refresh slice\n  // for Hosthub revisions; spend the rest of the cap on zeros.\n  const refreshTake = refresh.slice(0, 50);\n  const missingTake = missing.slice(0, Math.max(0, 500 - refreshTake.length));\n  return { taxTargets: missingTake.concat(refreshTake), missingCount: missing.length, refreshCount: refresh.length };\n}\n\n// ── Core sync function (shared by HTTP endpoint + auto-scheduler) ─────────────\nasync function runSync(apiKey, onLog) {",
+   "count": 1
+  },
+  {
+   "note": "Tax fetch uses missing-first cap instead of newest-checkout sort",
+   "find": "  const taxCutoff = new Date(Date.now() - 90 * 86400 * 1000).toISOString().slice(0, 10);\n  const needTax = bookingEvs.filter(ev => {\n    const prev = prevBkById[ev.id];\n    if (!prev || !hasTaxData(prev)) return true;\n    return String(ev.date_to || '') >= taxCutoff;\n  });\n  needTax.sort((a, b) => String(b.date_to || '').localeCompare(String(a.date_to || '')));\n  const taxTargets = needTax.slice(0, 500);\n  log(`Fetching Greek taxes for ${taxTargets.length}/${bookingEvs.length} bookings (rest reuse stored values)…`);",
+   "replace": "  const { taxTargets, missingCount, refreshCount } = selectGrTaxTargets(bookingEvs, prevBkById);\n  log(`Fetching Greek taxes for ${taxTargets.length}/${bookingEvs.length} bookings (${missingCount} missing in backlog, ${refreshCount} recent refresh, missing-first cap)…`);",
+   "count": 1
+  },
+  {
+   "note": "fetchPages 429 retry budget resets after each successful page",
+   "find": "    if (obj._err) { console.error(`fetchPages HTTP ${obj.status}`); break; }\n    const items = obj.data || [];",
+   "replace": "    if (obj._err) { console.error(`fetchPages HTTP ${obj.status}`); break; }\n    retries = 0; // retry budget is per page, not per fetchPages call\n    const items = obj.data || [];",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "function selectGrTaxTargets(",
+   "note": "tax target helper exists"
+  },
+  {
+   "has": "missing-first cap",
+   "note": "log names the missing-first policy"
+  },
+  {
+   "has": "retry budget is per page",
+   "note": "429 retries reset per page"
+  },
+  {
+   "hasNot": "const taxTargets = needTax.slice(0, 500);",
+   "note": "starving newest-first slice is gone"
+  }
+ ]
+}
