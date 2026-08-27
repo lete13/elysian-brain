@@ -28,7 +28,7 @@ this.shouldRunFullHosthubSync = shouldRunFullHosthubSync;
 this.estimateHosthubPullSavings = estimateHosthubPullSavings;
 ```
 
-After the `bookingHotelId` assert, add the block that starts `const win = mergeCtx.hosthubRollingWindow(new Date('2026-08-27T12:00:00Z'));` (six-month window, merge keeps pre-window stays, full pull only at `AUTO_SYNC_HOUR` once per day, savings ratio > 90% event HTTP and 0 stored-DB cut).
+After the `bookingHotelId` assert, add the block that starts `const win = mergeCtx.hosthubRollingWindow(new Date('2026-08-27T12:00:00Z'));` (six-month lookback, **all future** to ~730 days, 365-day chunks, merge keeps pre-window stays, full pull only at `AUTO_SYNC_HOUR` once per day, savings ratio > 90% event HTTP and 0 stored-DB cut).
 
 ## `tests/payments-check-votsala-group.test.js`
 

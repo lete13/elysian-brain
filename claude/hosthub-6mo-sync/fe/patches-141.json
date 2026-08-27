@@ -1,6 +1,6 @@
 {
  "baseSha256": "ba001e33b4dbec39b6ef14d767f8aafe5b95ad4bfcb00bafbeea97c9d080abfd",
- "expectedSha256": "ab871b1b2ea8f72f9ceb031be607d5b73185ec4b33039784463dda522bdd0098",
+ "expectedSha256": "581d6cd8b5df7b7b5cc9bcd918dcb73e3f8578b19fa25c84cebc8c721ecaa741",
  "builtAt": "2026-08-27 Hosthub regular sync is last 6 months; Full database is the daily pull",
  "patches": [
   {
@@ -24,7 +24,7 @@
   {
    "note": "Fetching copy matches the window",
    "find": "    syncLog('\\nFetching full database…', 'warn');",
-   "replace": "    syncLog(full ? '\\nFetching full database…' : '\\nFetching last 6 months + upcoming stays…', 'warn');",
+   "replace": "    syncLog(full ? '\\nFetching full database…' : '\\nFetching last 6 months + all future stays…', 'warn');",
    "count": 1
   },
   {

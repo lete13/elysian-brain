@@ -1,9 +1,9 @@
 'use strict';
 /**
  * Build srv/patches-107.json + fe/patches-141.json:
- * Regular Hosthub sync pulls a rolling 6-month stay window (plus the next
- * 6 months so Daily Ops still sees future arrivals). The whole database is
- * pulled once a day at AUTO_SYNC_HOUR (default 04:00 server time).
+ * Regular Hosthub sync pulls last 6 months of stays plus all future
+ * bookings (Hosthub allows ~730 days out; requests are split into 365-day
+ * chunks). The whole database is pulled once a day at AUTO_SYNC_HOUR.
  *
  * Run from the elysian-clearing repo root:
  *   node scripts/_build-hosthub-6mo-sync.js
@@ -66,6 +66,8 @@ console.log('bases', srv.last, srv.sha.slice(0, 12), fe.last, fe.sha.slice(0, 12
 const helpersFind = 'function mergeAptsProtect(dbApts, inApts) {';
 const helpersReplace =
   'const HOSTHUB_ROLL_MONTHS = 6;\n' +
+  'const HOSTHUB_FUTURE_DAYS = 730;\n' +
+  'const HOSTHUB_CHUNK_DAYS = 365;\n' +
   'function hosthubIsoDay(d) {\n' +
   '  const x = d instanceof Date ? d : new Date(d);\n' +
   '  if (!isFinite(x.getTime())) return \'\';\n' +
@@ -76,12 +78,31 @@ const helpersReplace =
   '  d.setUTCMonth(d.getUTCMonth() + months);\n' +
   '  return d;\n' +
   '}\n' +
+  'function hosthubAddDays(from, days) {\n' +
+  '  const d = new Date(from.getTime());\n' +
+  '  d.setUTCDate(d.getUTCDate() + days);\n' +
+  '  return d;\n' +
+  '}\n' +
   'function hosthubRollingWindow(now) {\n' +
   '  const n = now || new Date();\n' +
   '  return {\n' +
   '    from: hosthubIsoDay(hosthubShiftMonths(n, -HOSTHUB_ROLL_MONTHS)),\n' +
-  '    to: hosthubIsoDay(hosthubShiftMonths(n, HOSTHUB_ROLL_MONTHS)),\n' +
+  '    to: hosthubIsoDay(hosthubAddDays(n, HOSTHUB_FUTURE_DAYS)),\n' +
   '  };\n' +
+  '}\n' +
+  'function hosthubRollingChunks(window) {\n' +
+  '  if (!window || !window.from || !window.to) return [];\n' +
+  '  const chunks = [];\n' +
+  '  let start = new Date(window.from + \'T00:00:00Z\');\n' +
+  '  const end = new Date(window.to + \'T00:00:00Z\');\n' +
+  '  if (!isFinite(start.getTime()) || !isFinite(end.getTime()) || start >= end) return [{ from: window.from, to: window.to }];\n' +
+  '  while (start < end) {\n' +
+  '    let next = hosthubAddDays(start, HOSTHUB_CHUNK_DAYS);\n' +
+  '    if (next > end) next = end;\n' +
+  '    chunks.push({ from: hosthubIsoDay(start), to: hosthubIsoDay(next) });\n' +
+  '    start = next;\n' +
+  '  }\n' +
+  '  return chunks;\n' +
   '}\n' +
   'function hosthubEventsUrl(path, window) {\n' +
   '  let url = BASE + path + \'?is_visible=all\';\n' +
@@ -214,19 +235,25 @@ const calFind =
   '    if (added > 0) log(`  ${rental.name}: +${added}`);\n' +
   '  }';
 const calReplace =
-  '  // 3. Calendar events — rolling 6 months on the regular cycle; full list once a day\n' +
+  '  // 3. Calendar events — last 6 months + all future on the regular cycle; full list once a day\n' +
   '  const rollWin = full ? null : hosthubRollingWindow(new Date());\n' +
   '  results.window = rollWin;\n' +
   '  log(full\n' +
   '    ? \'Fetching all bookings (daily full database)…\'\n' +
-  '    : (\'Fetching last \' + HOSTHUB_ROLL_MONTHS + \' months + next 6 (\' + rollWin.from + \' → \' + rollWin.to + \')…\'));\n' +
+  '    : (\'Fetching last \' + HOSTHUB_ROLL_MONTHS + \' months + all future (\' + rollWin.from + \' → \' + rollWin.to + \')…\'));\n' +
   '  const allEvents = []; const seen = new Set();\n' +
   '  const addEvents = (evs) => { for (const e of evs) { if (!seen.has(e.id)) { seen.add(e.id); allEvents.push(e); } } };\n' +
   '\n' +
-  '  const globalEvs = await fetchPages(hosthubEventsUrl(\'/calendar-events\', rollWin), apiKey,\n' +
-  '    (total, pageLen, page) => { if (pageLen > 0) log(`  Global page ${page}: +${pageLen} (${total} total)`); }\n' +
-  '  ).catch(() => []);\n' +
-  '  addEvents(globalEvs);\n' +
+  '  const rollChunks = rollWin ? hosthubRollingChunks(rollWin) : [{ from: null, to: null }];\n' +
+  '  for (let ci = 0; ci < rollChunks.length; ci++) {\n' +
+  '    const chunk = full ? null : rollChunks[ci];\n' +
+  '    if (chunk && rollChunks.length > 1) log(\'  Date chunk \' + (ci + 1) + \'/\' + rollChunks.length + \' \' + chunk.from + \' → \' + chunk.to);\n' +
+  '    const globalEvs = await fetchPages(hosthubEventsUrl(\'/calendar-events\', chunk), apiKey,\n' +
+  '      (total, pageLen, page) => { if (pageLen > 0) log(`  Global page ${page}: +${pageLen} (${total} total)`); }\n' +
+  '    ).catch(() => []);\n' +
+  '    addEvents(globalEvs);\n' +
+  '    if (full) break;\n' +
+  '  }\n' +
   '\n' +
   '  if (full) {\n' +
   '    log(`  Per-rental fetch for ${rentals.length} properties…`);\n' +
@@ -391,16 +418,18 @@ const capReplace = 'for (let cn = 2; cn <= 180; cn++) { /* legacy note: cn <= 40
 writePatch('srv', 107, srv.sha, [
   { note: 'Rolling-window helpers + persistHosthubSync', find: helpersFind, replace: helpersReplace, count: 1 },
   { note: 'runSync accepts {full} for the daily whole-database pull', find: runSyncFind, replace: runSyncReplace, count: 1 },
-  { note: 'Regular sync fetches the 6-month window and skips per-rental', find: calFind, replace: calReplace, count: 1 },
+  { note: 'Regular sync fetches last 6 months + all future and skips per-rental', find: calFind, replace: calReplace, count: 1 },
   { note: 'Client-side window filter if Hosthub ignores date_from/date_to', find: windowFind, replace: windowReplace, count: 1 },
   { note: 'POST /api/sync persists a rolling merge; full:true pulls the whole database', find: httpFind, replace: httpReplaceNoTrampoline, count: 1 },
   { note: '15-minute auto-sync is rolling; AUTO_SYNC_HOUR runs the daily full pull', find: autoFind, replace: autoReplace, count: 1 },
   { note: 'FE bootstrap through patches-180 so FE 141 applies', find: capFind, replace: capReplace, count: 1 },
-], '2026-08-27 Regular Hosthub sync is last 6 months; full database once a day at AUTO_SYNC_HOUR', [
+], '2026-08-27 Regular Hosthub sync is last 6 months + all future; full database once a day at AUTO_SYNC_HOUR', [
   { has: 'function mergeRollingBookings(', note: 'rolling merge keeps older stays' },
   { has: 'function shouldRunFullHosthubSync(', note: 'daily full pull gate' },
+  { has: 'HOSTHUB_FUTURE_DAYS = 730', note: 'future stays are not capped at 6 months' },
+  { has: 'function hosthubRollingChunks(', note: 'Hosthub 365-day span split' },
   { has: 'Rolling sync skips the per-rental walk', note: 'regular cycle skips 57 rental walks' },
-  { has: 'hosthubEventsUrl(\'/calendar-events\', rollWin)', note: 'date-windowed global list' },
+  { has: 'hosthubEventsUrl(\'/calendar-events\', chunk)', note: 'date-windowed global list in 365-day chunks' },
   { has: 'shouldRunFullHosthubSync(started, lastFull)', note: 'auto-sync chooses full vs rolling' },
   { has: 'cn <= 180', note: 'FE chain cap raised for patches-141' },
 ]);
@@ -422,7 +451,7 @@ const feLogFind = '  syncLog(`Starting full sync  key: ${key.slice(0,8)}…`);';
 const feLogReplace = '  syncLog(`Starting ${full ? \'FULL database\' : \'last-6-months\'} sync  key: ${key.slice(0,8)}…`);';
 
 const feFetchFind = '    syncLog(\'\\nFetching full database…\', \'warn\');';
-const feFetchReplace = '    syncLog(full ? \'\\nFetching full database…\' : \'\\nFetching last 6 months + upcoming stays…\', \'warn\');';
+const feFetchReplace = '    syncLog(full ? \'\\nFetching full database…\' : \'\\nFetching last 6 months + all future stays…\', \'warn\');';
 
 const feBodyFind =
   '      body: JSON.stringify({\n' +

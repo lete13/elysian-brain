@@ -1,21 +1,36 @@
-# Hosthub regular sync = last 6 months; full database once a day
+# Hosthub regular sync = last 6 months + all future; full database once a day
 
 **27 Aug 2026.** Every 15-minute auto-sync still walks the **whole** Hosthub calendar (~6,000 events) plus a sequential per-rental fetch for all 57 properties. That is what rate-limited the 22 Aug deploy restart (PR #164: ~2,000 of ~6,000 events, then tax 429s). Greek taxes are already capped at 500/cycle; the remaining cost is the event list.
+
+## Why bookings and taxes are pulled separately
+
+Hosthub does not put Greek tax on the booking list. `GET /calendar-events` returns dates, guest, `guest_paid`, `booking_value`, and a generic `taxes` bucket. It does **not** include:
+
+- `climate_tax` (TAKK)
+- `vat`
+- `accommodation_tax`
+- `booking_value_pre_vat`
+
+Those live on a different resource, one stay at a time:
+
+`GET /calendar-events/{id}/calendar-event-gr-taxes`
+
+There is no `include=gr_taxes` on the list API. Elysian therefore lists bookings first, then N+1s that tax endpoint. Coupling “replace `S.bks` from the list” with “we must have fetched every tax row in the same cycle” is why a 429 on the tax pass wrote `ct: 0` across the portfolio on 22 Aug. Regular sync still reuses stored tax and caps tax GETs at 500; the daily full pull refreshes the booking list; a dedicated full tax pull (see `hosthub-tax-backfill.md`) is how missing TAKK is recovered without listing the whole history every 15 minutes.
 
 ## What changes
 
 | Cycle | What Hosthub is asked for | What is stored |
 |---|---|---|
-| Regular (15 min, ↻ Refresh, **Sync last 6 months**) | Stays whose checkout is in the last 6 months, plus the next 6 months so Daily Ops still sees future arrivals. No per-rental walk. | Merged into existing `S.bks` by Hosthub id. Older stays are **kept**. |
+| Regular (15 min, ↻ Refresh, **Sync last 6 months**) | Stays whose checkout is in the **last 6 months**, plus **all future stays** Hosthub will return (~730 days out — their API cap). Requests are split into 365-day chunks because Hosthub will not accept a wider `date_from`/`date_to` span. No per-rental walk. | Merged into existing `S.bks` by Hosthub id. Older stays are **kept**. |
 | Daily full (`AUTO_SYNC_HOUR`, default 04:00 server time, **Full database**) | Unfiltered global list + per-rental walk, same as today. Anti-wipe 70% guard still applies. | Replaces the booking list (history refreshes). |
 
-The rolling window is checkout ≥ today−6 months through today+6 months (Hosthub `date_from`/`date_to` on the list call, plus a client-side filter if Hosthub ignores those query params). A stay that checks out next winter is included; a stay that checked out 8 months ago is not re-fetched until the nightly full pull.
+A stay that checks in next winter is on the regular pull. A stay that checked out 8 months ago is not re-fetched until the nightly full pull.
 
 Manual **Full database** sends `{full: true}` on `POST /api/sync`. After either mode the server persists; the browser reloads from the database so it cannot wipe older stays the way the old `S.bks = []; id: gid()` path did.
 
 ## Time and size
 
-Live corpus (22 Aug PR #164 / 27 Aug tax-backfill notes): **~6,000 calendar events**, **57 rentals**, Hosthub page size observed ~2,000. Planning number for the rolling window: **~half** the stays (last 6 months of a ~2-year book plus upcoming inventory). Exact split will show in the first rolling log line `Window YYYY-MM-DD → YYYY-MM-DD: N/M stays`.
+Live corpus (22 Aug PR #164 / 27 Aug tax-backfill notes): **~6,000 calendar events**, **57 rentals**, Hosthub page size observed ~2,000. Planning number for the rolling window: **about half** the stays (last 6 months of a ~2-year book **plus all upcoming inventory**). Exact split will show in the first rolling log line `Window YYYY-MM-DD → YYYY-MM-DD: N/M stays`.
 
 | | Today, every 15 min | After, regular cycle | After, per day (95 rolling + 1 full) |
 |---|---|---|---|
