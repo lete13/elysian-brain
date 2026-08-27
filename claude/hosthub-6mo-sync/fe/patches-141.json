@@ -1,0 +1,67 @@
+{
+ "baseSha256": "ba001e33b4dbec39b6ef14d767f8aafe5b95ad4bfcb00bafbeea97c9d080abfd",
+ "expectedSha256": "ab871b1b2ea8f72f9ceb031be607d5b73185ec4b33039784463dda522bdd0098",
+ "builtAt": "2026-08-27 Hosthub regular sync is last 6 months; Full database is the daily pull",
+ "patches": [
+  {
+   "note": "Dashboard: last-6-months button + full-database button",
+   "find": "      <button class=\"btn gold\" id=\"sync-btn\" onclick=\"startSync()\" style=\"font-size:14px;padding:10px 22px;font-weight:600\">\n        <i class=\"ti ti-refresh\"></i> Sync all bookings\n      </button>",
+   "replace": "      <button class=\"btn gold\" id=\"sync-btn\" onclick=\"startSync()\" style=\"font-size:14px;padding:10px 22px;font-weight:600\">\n        <i class=\"ti ti-refresh\"></i> Sync last 6 months\n      </button>\n      <button class=\"btn sm\" id=\"sync-full-btn\" onclick=\"startSync(true)\" style=\"font-size:12px;padding:10px 14px\">Full database</button>",
+   "count": 1
+  },
+  {
+   "note": "startSync(full) sends full:true for the whole-database pull",
+   "find": "async function startSync() {",
+   "replace": "async function startSync(full) {\n  full = !!full;",
+   "count": 1
+  },
+  {
+   "note": "Sync log says rolling vs full",
+   "find": "  syncLog(`Starting full sync  key: ${key.slice(0,8)}…`);",
+   "replace": "  syncLog(`Starting ${full ? 'FULL database' : 'last-6-months'} sync  key: ${key.slice(0,8)}…`);",
+   "count": 1
+  },
+  {
+   "note": "Fetching copy matches the window",
+   "find": "    syncLog('\\nFetching full database…', 'warn');",
+   "replace": "    syncLog(full ? '\\nFetching full database…' : '\\nFetching last 6 months + upcoming stays…', 'warn');",
+   "count": 1
+  },
+  {
+   "note": "POST /api/sync carries full flag",
+   "find": "      body: JSON.stringify({\n        apiKey: key,\n        rentalsEndpoint:  rentalsResult?.url || null,\n        bookingsEndpoint: bookingsResult?.url || null,\n      })",
+   "replace": "      body: JSON.stringify({\n        apiKey: key,\n        full: !!full,\n        rentalsEndpoint:  rentalsResult?.url || null,\n        bookingsEndpoint: bookingsResult?.url || null,\n      })",
+   "count": 1
+  },
+  {
+   "note": "After a persisted rolling/full sync, reload S from DB (do not wipe older stays)",
+   "find": "    syncProgress(95);\n    syncLog(`\\nProcessing ${finalData.bookings.length} bookings…`, 'warn');\n\n    // Import data into state\n    const prevApts = S.apts.length;\n    S.bks = [];",
+   "replace": "    syncProgress(95);\n    syncLog(`\\nProcessing ${finalData.bookings.length} bookings…`, 'warn');\n\n    // Import data into state. A rolling sync has already been merged+saved\n    // on the server — reload so older-than-6-month stays are not wiped.\n    const prevApts = S.apts.length;\n    if (finalData.persisted) {\n      syncLog('\\nServer saved the merge — reloading from the database (older stays kept)…', 'ok');\n      _dataInitialized = false;\n      await loadFromDb();\n      localStorage.setItem('hh_last_sync', new Date().toISOString());\n      save();\n      syncProgress(100);\n      renderDash(); populateBkF(); renderBk(); renderCfg(); updBkBadge();\n      document.getElementById('sync-spinner').style.display = 'none';\n      document.getElementById('sync-done').style.display = 'block';\n      document.getElementById('sync-done-msg').textContent = `✓ ${S.bks.length} bookings in the database`;\n      document.getElementById('sync-done-sub').textContent = (finalData.mode === 'full' ? 'Full database pull' : 'Last 6 months merged') + ' · ' + S.apts.length + ' properties · ' + new Date().toLocaleTimeString('el-GR');\n      document.getElementById('sync-modal-title').textContent = 'Sync complete';\n      document.getElementById('sync-modal-sub').textContent = '';\n      initSyncUI();\n      return;\n    }\n    S.bks = [];",
+   "count": 1
+  },
+  {
+   "note": "Banner status describes the rolling window",
+   "find": "    else sub.textContent = 'API key configured — click to sync all bookings';",
+   "replace": "    else sub.textContent = 'API key configured — regular sync is last 6 months; full database once a day overnight';",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "Sync last 6 months",
+   "note": "dashboard rolling button"
+  },
+  {
+   "has": "startSync(true)",
+   "note": "full-database button"
+  },
+  {
+   "has": "full: !!full",
+   "note": "client sends the full flag"
+  },
+  {
+   "has": "finalData.persisted",
+   "note": "reload from DB after server merge"
+  }
+ ]
+}
