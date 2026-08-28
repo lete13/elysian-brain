@@ -1,6 +1,6 @@
 # Elysian — Master Memory Document
 
-**v1.5 · 28 Aug 2026 · maintained by Lefteris + Claude**
+**v1.6 · 28 Aug 2026 · maintained by Lefteris + Claude**
 
 Purpose: the single source of truth about Elysian for any Claude session. Keep this in the Claude project (suggested path `claude/elysian-memory.md`), alongside the feature docs.
 
@@ -15,7 +15,7 @@ Purpose: the single source of truth about Elysian for any Claude session. Keep t
 - **Elysian** — short-term rental property management, run by **Lefteris**. Single legal entity: an **ΙΚΕ**, covering all locations including Thessaloniki (ΑΦΜ deliberately excluded from docs).
 - **Team**: Lefteris (owner/manager — reviews proofs, pushes code, makes money decisions) · **Popi** (accounting — monthly checklist, Payments Check) · **George & John** (operations — Daily Ops / Checkout Tracker side).
 - **External accountant**: **E-New Generation** — files the monthly VAT return (fully out of Elysian's checklist scope) and receives Elysian's platform invoices monthly (§6).
-- **Portfolio: 57 apartments** — 27 leased 🏢 · 16 B2B 🤝 · 14 private 🏠 (live pull, 27 Jul 2026). Clusters: Athens metro (incl. Piraeus, Cholargos, Zografou, Nea Smyrni, Tavros, Psychiko), **Thessaloniki operation: 8 units** (launched Apr 2026 with 5) — Cornerstone, Hightower, Le Alex, Le Floor, Le Grace, Le Plaza, The Skarlatos residence, plus **ARITI 7 in Halkidiki (a sub-area of the Thessaloniki operation)**. Remaining regional units (Kefalonia, Lesbos, Corinthia, Lavrio, Porto Rafti) are **individual units under the normal model** — no separate segment.
+- **Portfolio: 61 operating apartments** — 31 leased 🏢 · 16 B2B 🤝 · 14 private 🏠, plus **ZZ-TEST-DONOTUSE** (dummy row in Configuration; not an operating unit). Live snapshot 28 Aug 2026: [`claude/apartment-config.md`](claude/apartment-config.md). Clusters: Athens metro (incl. Piraeus, Cholargos, Zografou, Nea Smyrni, Tavros, Psychiko, Marousi, Pallini), **Thessaloniki operation: 8 units** (launched Apr 2026 with 5) — Cornerstone, Hightower, Le Alex, Le Floor, Le Grace, Le Plaza, The Skarlatos residence, plus **ARITI 7 in Halkidiki (a sub-area of the Thessaloniki operation)**. Remaining regional units (Kefalonia, Lesbos, Corinthia, Lavrio, Porto Rafti) are **individual units under the normal model** — no separate segment. Added since 27 Jul 2026: **Elysian Ariadne**, **Elysian Mary**, **Amarysia Residence**, **Pallantides Residence**; **Filonexia** renamed **Filoxenia**.
 - **Channels**: Airbnb, Booking.com, and **direct** (including Elysian's own direct websites). No other OTAs — Payments Check's Airbnb+BDC scope is complete. Watch-item: if a direct site ever takes *online* payments, those credits fall outside the Payments Check model.
 - **Channel manager / PMS: Hosthub** — syncs ~every 2 hours; ↻ Refresh in Payments Check forces one. Server also has a daily `AUTO_SYNC_HOUR` cron.
 - **Bank: Viva** business account — all Booking.com and Airbnb payouts in; **owner remittances out as one manual transfer per owner** after their report.
@@ -41,15 +41,17 @@ Lifetime (May 2025 – Jun 2026): 4,370 checkouts · €696,210 gross · €589,
 
 ### ⭐ The Configuration principle (governs everything below)
 
-**Every rate is per-apartment data in the Configuration tab, never a constant.** Management fee %, cleaning fee, all VAT/tax behaviour, business tax, fixed charges, report language — all live in `S.apts` and vary by property/profile. **Never hard-code a rate; read it live.** Schema (from the live app, 27 Jul 2026):
+**Every rate is per-apartment data in the Configuration tab, never a constant.** Management fee %, cleaning fee, all VAT/tax behaviour, business tax, fixed charges, report language — all live in `S.apts` and vary by property/profile. **Never hard-code a rate; read it live** (or from the last snapshot in [`claude/apartment-config.md`](claude/apartment-config.md) / [`claude/apartment-config.json`](claude/apartment-config.json)). Schema (from the live app, 28 Aug 2026):
 
-`id · name · aliases · city · lat/lng · profile · isLeased · b2b · b2bPartner · b2bRemitRate · mgmtFee · cleaningFee · fixedCharges[] · businessTax · chargeVat · deductVAT · vatLiable · vatOnFees · municipalityTax · deductCT · deductCleaning · language · ownerName · ownerSurname · ownerEmail · postReportReminders[]`
+`id · name · aliases · city · address · lat/lng · profile · isLeased · language · ownerName · ownerSurname · ownerEmail · ownerEmail2 · ownerEmail3 · ownerPhone · mgmtFee · cleaningFee · fixedCharges[] · businessTax · businessTaxAmt · vatLiable · chargeVat · vatOnFees · deductVAT · deductCT · deductCleaning · municipalityTax · b2b · b2bPartner · b2bRemitRate · clearGroup · postReportReminders[] · airbnbUrl · bookingUrl · bookingHotelId · oxyContactId · oxyContactName`
+
+ΑΦΜ / tax-ID keys must never be copied into this repo. `b2bPartner` is still empty on all B2B units; grouping often lives in `clearGroup` (Votsala, Michalakopoulou, Cedar Apt, Veranda, Le Apartments, Sarris).
 
 ### Property profiles
 
 | Profile | Count | Meaning | Accommodation VAT + municipality tax |
 |---|---|---|---|
-| **Leased 🏢** | 27 | Elysian leases the unit | Elysian deducts **and remits** |
+| **Leased 🏢** | 31 | Elysian leases the unit | Elysian deducts **and remits** |
 | **Private 🏠** | 14 | Owner's unit, Elysian manages | **Owner** handles taxes independently |
 | **B2B 🤝** | 16 | Managed for a B2B partner | Elysian deducts and remits **to the B2B partner** |
 
@@ -184,7 +186,7 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 
 **Closed 28 Aug 2026:** Votsala / Lycabettus business tax — **only Votsala 1 and Horizon carry the flag**; same-address exemption for Votsala 2–8, Panorama and Resilience (Run Tests P4, FE 142).
 
-**Data gaps (from the 27 Jul live pull):** `b2bPartner` empty on **all 16 B2B units** (needed for the 25th flow) · `language` unset on 4 units (A modern & Peaceful · Elysian Agon · The Skarlatos residence · Vista Acropolis).
+**Data gaps (from the 28 Aug 2026 snapshot):** `b2bPartner` empty on **all 16 B2B units** (needed for the 25th flow — `clearGroup` is filled for Cedar / Veranda / Le Apartments) · `language` unset on 5 units (A modern & Peaceful · Vista Acropolis · The Skarlatos residence · Amarysia Residence · Pallantides Residence). Elysian Agon now has GR.
 
 **External / infra:** Viva `biservices:datafileapi` scope (ask account manager) · **Railway Postgres backup status unverified** · P & G Apartment (Lesbos) dormant since 14 Jul — verify in Hosthub before any removal (see §4 matrix).
 
@@ -204,71 +206,20 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 
 ---
 
-## 9. Property directory (live pull 27 Jul 2026 — profile/language/BT from `S.apts`)
+## 9. Property directory
 
-ᵀ = Thessaloniki operation (8) · ★ = golden test property · BT = businessTax flag · Lang — = unset.
+**Canonical copy of every apartment's Configuration flags:** [`claude/apartment-config.md`](claude/apartment-config.md) (readable tables) and [`claude/apartment-config.json`](claude/apartment-config.json) (machine-readable). Pulled from production `S.apts` on **28 Aug 2026**. Refresh those files when Configuration changes. **Do not store ΑΦΜ.** Owner names and emails are fine in this private repo.
 
-| # | Apartment | City | Profile | Lang | BT |
-|---|---|---|---|---|---|
-| 1 | A modern & Peaceful apartment • Near metro station | Piraeus | 🏠 private | — | |
-| 2 | Acropolis Skyline Sunset ★ | Athens | 🏠 private | GR | |
-| 3 | ARITI 7 ᵀ | Chaniotis (Halkidiki) | 🤝 b2b | EN | |
-| 4 | Art House | Athens | 🏠 private | EN | |
-| 5 | Art Island Apartment | Athens | 🏢 leased | EN | BT |
-| 6 | Athens Riviera Escape | Argyroupoli | 🏠 private | EN | |
-| 7 | Athens Unity Apartment | Cholargos | 🏢 leased | EN | BT |
-| 8 | Avenue of Gods: Irakli's Retreat | Athens | 🏠 private | EN | |
-| 9 | Birdhouse Apartment | Cholargos | 🏢 leased | EN | BT |
-| 10 | City Nexus Family apt, Kolonos | Athens | 🏠 private | EN | |
-| 11 | Coloneum | Athens | 🏢 leased | EN | BT |
-| 12 | Cozy Acropolis backyard haven | Athens | 🏠 private | EN | |
-| 13 | Cozy Corner Zografou ★ | Zografou | 🤝 b2b | EN | |
-| 14 | Eclectic Apartment with Stunning Seaview | Porto Rafti | 🏢 leased | EN | BT |
-| 15 | Elysian Agon | Cholargos | 🏢 leased | — | BT |
-| 16 | Elysian Cornerstone ᵀ | Thessaloniki | 🏢 leased | EN | BT |
-| 17 | Elysian Hightower ᵀ | Thessaloniki | 🏢 leased | EN | BT |
-| 18 | Elysian Ithaki | Athens | 🏠 private | EN | |
-| 19 | Elysian Lycabettus - Horizon ★ | Athens | 🏢 leased | EN | BT |
-| 20 | Elysian Lycabettus - Panorama | Athens | 🏢 leased | EN | *same address as Horizon* |
-| 21 | Elysian Lycabettus Resilience | Athens | 🏢 leased | EN | *same address as Horizon* |
-| 22 | Elysian Smyrni \| Marble Elegance Retreat | Nea Smyrni | 🏠 private | EN | |
-| 23 | Filonexia Apartment Athens | Cholargos | 🏢 leased | EN | BT |
-| 24 | Le Alex, Bright & Modern Escape near CityCenter ᵀ | Neapoli | 🤝 b2b | EN | |
-| 25 | Le Floor, Urban Escape near Thessaloniki center ᵀ | Neapoli | 🤝 b2b | EN | |
-| 26 | Le Grace, Urban Retreat Near CityCenter & Sea ᵀ | Thessaloniki | 🤝 b2b | EN | |
-| 27 | Le Plaza, Modern Escape near Thessaloniki Center ᵀ | Thessaloniki | 🤝 b2b | EN | |
-| 28 | Navarino Athenian Nest | Athens | 🏢 leased | EN | BT |
-| 29 | P & G Apartment ⚠ dormant | Pamfila (Lesbos) | 🏠 private | EN | |
-| 30 | Pixie Studio Athens | Psychiko | 🏢 leased | EN | BT |
-| 31 | Seaside Lavrio Beach House | Lavrio (E. Attica) | 🤝 b2b | EN | |
-| 32 | Stylish Downtown Apartment | Athens | 🏢 leased | EN | BT |
-| 33 | Sunset Nest in Fiskardo | Fiskardo (Kefalonia) | 🏠 private | EN | |
-| 34 | Svorex Apartment 1 | Athens | 🏢 leased | GR | BT |
-| 35 | The Athenian Atelier \| Kolonaki Sqr | Athens | 🤝 b2b | EN | |
-| 36 | The Athenian Cedar | Athens | 🤝 b2b | EN | |
-| 37 | The Athenian Veranda | Athens | 🤝 b2b | EN | |
-| 38 | The Athenian Veranda 2 | Athens | 🤝 b2b | EN | |
-| 39 | The Athenian Veranda 3 | Athens | 🤝 b2b | EN | |
-| 40 | The Athenian Veranda 4 | Athens | 🤝 b2b | EN | |
-| 41 | The Athenian Vintage | Athens | 🏢 leased | EN | BT |
-| 42 | The Brightline Apartment Athens | Athens | 🏢 leased | EN | BT |
-| 43 | The Monograph | Athens | 🤝 b2b | EN | |
-| 44 | The Olive & Cedar Apartment | Athens | 🤝 b2b | EN | |
-| 45 | The Skarlatos residence ᵀ | Sykies | 🏠 private | — | |
-| 46 | The Tauros Metro Residence | Tavros | 🏠 private | EN | |
-| 47 | Urban Cedar Apartment | Athens | 🤝 b2b | EN | |
-| 48 | Villa Liberty | Isthmia (Corinthia) | 🏠 private | EN | |
-| 49 | Vista Acropolis | Athens | 🏢 leased | — | BT |
-| 50 | Votsala 1 Luxury Stay with Patio | Piraeus | 🏢 leased | EN | BT |
-| 51 | Votsala 2 Luxury Stay with Patio | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
-| 52 | Votsala 3 Deluxe & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
-| 53 | Votsala 4 Small & Elegant Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
-| 54 | Votsala 5 Luxury Studio with Balcony in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
-| 55 | Votsala 6 Deluxe & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
-| 56 | Votsala 7 Small & Elegant Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
-| 57 | Votsala 8 Elegant & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
+Do not keep a second full directory table in this document (anti-bloat). Quick facts from that snapshot:
 
-Owner names/emails and per-unit rates live in `S.apts` / Configuration — read live when needed (fine to use; only the ΑΦΜ is excluded from docs).
+- **62 rows** in Configuration, of which **ZZ-TEST-DONOTUSE** is a dummy.
+- **Operating: 61** — 31 leased 🏢 · 16 B2B 🤝 · 14 private 🏠.
+- **New since 27 Jul 2026:** Elysian Ariadne · Elysian Mary (Cholargos, leased, Sarris group) · Amarysia Residence (Marousi) · Pallantides Residence (Pallini). **Filonexia** is now **Filoxenia**.
+- **Thessaloniki operation (8):** Cornerstone, Hightower, Le Alex, Le Floor, Le Grace, Le Plaza, The Skarlatos residence, ARITI 7 (Halkidiki).
+- **Golden test properties:** *Elysian Lycabettus – Horizon* 🏢 · *Cozy Corner Zografou* 🤝 · *Acropolis Skyline Sunset* 🏠.
+- **P4 same-address:** Votsala 1 and Horizon carry `businessTax`; Votsala 2–8, Panorama and Resilience are exempt (`claude/p4-same-address-bt.md`).
+
+Read rates, tax flags, fixed charges, and owners from the snapshot or live `S.apts` — never from memory of the 27 Jul table.
 
 ---
 
@@ -286,7 +237,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked) · `claude/p4-same-address-bt.md` (28 Aug 2026 — P4 carriers Votsala 1 and Horizon)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked) · `claude/p4-same-address-bt.md` (28 Aug 2026 — P4 carriers Votsala 1 and Horizon) · `claude/apartment-config.md` + `claude/apartment-config.json` (28 Aug 2026 — live Configuration snapshot for every apartment)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
@@ -313,6 +264,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **v1.6 (28 Aug 2026)** — Live Configuration snapshot for **all apartments** in [`claude/apartment-config.md`](claude/apartment-config.md) / [`claude/apartment-config.json`](claude/apartment-config.json). Operating portfolio **61** (31 leased / 16 B2B / 14 private) plus dummy ZZ-TEST-DONOTUSE. New units: Ariadne, Mary, Amarysia, Pallantides; Filonexia → Filoxenia. §9 directory table retired in favour of the snapshot (anti-bloat). ΑΦΜ never stored. Source: production `/api/db/data` 28 Aug 2026.
 - **v1.5 (28 Aug 2026)** — Business tax same-address rule: **only Votsala 1 and Horizon carry the flag**; Votsala 2–8, Panorama and Resilience are exempt. Run Tests P4 (FE 142 / SRV 109). Doc: `claude/p4-same-address-bt.md`.
 - **v1.4 (15 Aug 2026)** — Platform Invoices Airbnb pull **live** (new-tab `www.airbnb.gr` capture; archive by **VAT issue date**, not Hosthub `created`/`cancelledAt`; Hosthub codes; Excel ship). Two-code test saved real AIUC PDFs (job `ppmsuw193wm05or`). Booking.com parked. `USERS_JSON` confirmed on Railway. Platform Invoices is a primary Accounting/Admin tab. Daily Ops Beta UI and Personnel remain as of 8 Aug. Doc: `claude/platform-invoices-feature.md`. Source: live Collect 15 Aug 2026; Lefteris dating rule; clearing `main` `db13617` / `5eff0da`.
 - **13 Aug 2026** — Platform invoices: **Airbnb = Hosthub `reservationId` → confirmation-code pull** (VAT Invoicer-style); Booking.com pull parked for now. Doc: `claude/platform-invoices-feature.md`.

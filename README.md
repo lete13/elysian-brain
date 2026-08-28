@@ -13,6 +13,8 @@ Private knowledge base — the canonical home of Elysian's memory document, feat
 
 - `elysian-memory.md` — the master memory document (versioned; changelog at the bottom)
 - `claude/` — feature docs for the Elysian Clearing app
+  - `apartment-config.md` / `apartment-config.json` — live Configuration (`S.apts`) snapshot for every apartment (rates, tax flags, owners; never ΑΦΜ)
+  - `p4-same-address-bt.md` — Run Tests P4: only Votsala 1 and Horizon carry business tax
   - `platform-invoices-feature.md` — Airbnb/Booking.com host-portal invoices → accountants (≠ Oxygen)
   - `monthly-close-and-oxygen.md` — Monthly Close + Oxygen owner documents
   - `hosthub-tax-backfill.md` — SRV 108 / FE 141: failed-run flag + full Hosthub pull including Greek taxes (TAKK) after the 22 Aug wipe

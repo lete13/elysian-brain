@@ -22,3 +22,5 @@ Apply on top of FE 141 / SRV 108 (Hosthub tax recovery). Copy:
 - `srv/patches-109.json`
 
 Live 28 Aug: Votsala 1 and Horizon have `businessTax` on; Votsala 2–8, Panorama and Resilience do not. Payout still follows each unit’s own flag.
+
+Full live Configuration for every apartment (fees, tax flags, owners): [`claude/apartment-config.md`](apartment-config.md).
