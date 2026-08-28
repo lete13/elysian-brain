@@ -1,0 +1,19 @@
+{
+ "baseSha256": "731c82d87a86d2f3fdd815d0566abe65e12e5c12d10d1ba71c7e82b80ae70adf",
+ "expectedSha256": "9396c2592cb6af23eb93ddf3b900cfd86a3b5ca36fc06f63aebe4063e518cb8c",
+ "builtAt": "2026-08-28 FE bootstrap through patches-142 (P4 same-address business tax)",
+ "patches": [
+  {
+   "note": "FE bootstrap through patches-142",
+   "find": "    for (let cn = 2; cn <= 141; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */ /* cn <= 140 */",
+   "replace": "    for (let cn = 2; cn <= 142; cn++) { /* legacy note: cn <= 40 */ /* cn <= 80 */ /* cn <= 90 */ /* cn <= 100 */ /* cn <= 120 */ /* cn <= 140 */ /* cn <= 141 */",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "cn <= 142",
+   "note": "FE bootstrap includes 142"
+  }
+ ]
+}

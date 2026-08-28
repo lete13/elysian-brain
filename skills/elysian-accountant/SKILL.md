@@ -23,7 +23,7 @@ These exist because a wrong number here is real money leaving or missing from a 
 1. **Never push to production.** Edit locally under `/mnt/user-data/outputs/elysian-clearing/`, present the files, and let Lefteris review and push.
 2. **Configuration is the source of truth for every rate.** Management fee, cleaning fee, VAT/tax behaviour, business tax, fixed charges, report language — all per-apartment in `S.apts` (fields: `profile, isLeased, b2b, b2bPartner, b2bRemitRate, mgmtFee, cleaningFee, fixedCharges[], businessTax, chargeVat, deductVAT, vatLiable, vatOnFees, municipalityTax, deductCT, deductCleaning, language, owner*`). **Never hard-code a rate; read it live.**
 3. **Never *initiate* money-moving changes** — expense attribution, profile or tax flags, sign corrections, `moOverride` steppers, edits to locked reports. Compute the impact, state it in euros per owner per month, and wait for an explicit yes on that specific item. **When Lefteris explicitly requests a specific action** ("tick the Birdhouse payout", "mark TAKK done for X", "enable that flag"), execute it in the live app via the browser — the decision is his; the clicking doesn't have to be. Follow the write protocol below for anything that saves config.
-4. **Respect the open-decision list** (bottom). Analysis touching Art Island, the 67 unassigned expenses, Votsala 2–8, or the Joël Ollivier booking must surface the pending decision — never quietly "fix" it.
+4. **Respect the open-decision list** (bottom). Analysis touching Art Island, the 67 unassigned expenses, or the Joël Ollivier booking must surface the pending decision — never quietly "fix" it.
 5. **Drift banners are a feature.** The amber banner on a locked report (`rptLocks`) means locked figures changed after sending. Explain what moved and why; never suppress it.
 6. **Verify before asserting.** Prefer reading live data or running the built-in tests over recalling numbers.
 
@@ -35,7 +35,7 @@ These exist because a wrong number here is real money leaving or missing from a 
 
 **Charges & levies:**
 - **Fixed monthly charges** — catalogue: **Software**, **Business Tax**, and **utilities (electricity / internet / water) depending on profile**; amounts in `fixedCharges`. Each bills **once per calendar month the report period touches** (15 Jun–15 Jul → ×2, multiplier shown). The ▲▼ stepper overrides the count per property+period (`moOverride`; "reset" → automatic). Business tax also reduces the mgmt-fee base once per month.
-- **Business tax (επιτηδεύματος)** is a **leased-profile** charge — invariant **P4 = leased ⇒ businessTax**. Live evidence: all 20 flagged units are leased; only Votsala 2–8 (leased) lack it. **Exemption rule: units at the same exact registered address may qualify** — the Votsala decision is an address-verification task for the accountant, not a judgment call: same address → exempt → relax P4; otherwise → enable the flag (≈ −€50/unit/month per owner + drift banners on locked reports).
+- **Business tax (επιτηδεύματος)** is a **leased-profile** charge — invariant **P4 = leased ⇒ businessTax**, with a same-address exemption. **Designated carriers (Lefteris, 28 Aug 2026): Votsala 1 and Elysian Lycabettus – Horizon.** Votsala 2–8, Panorama and Resilience do not need the flag. Other leased units still do. Payout still follows each unit’s own flag.
 - **TAKK — Τέλος Ανθεκτικότητας στην Κλιματική Κρίση** (Law 5162/2024; designation confirmed 31 Jul 2026): **Elysian issues it and pays it** for private apartments — the two monthly task lines, due internally by the **20th**. Statutory backstop: the monthly δήλωση απόδοσης via myAADE is due by the **last day of the following month**, so the internal 20th is deliberately early. Who files the δήλωση itself (E-New Generation vs in-house) — pending confirmation (residual unknowns).
 - **Previous Balance** may be negative = credit owed to the owner. Display patch (credit label, PDF double-negative, subtotal fix) is built but **not yet pushed** — until then negatives are hidden on screen while still in payout math.
 - **Παρακράτηση (~3%, contractor/technician invoices)**: the VAT is unchanged — only the *payment* splits in two (part paid by the vendor, part by Elysian). **The recorded invoice total is the full chargeable amount.** Approved app change (pending build): auto-tag these invoices as παρακράτηση and charge the total. Until deployed, the app may still just flag the `net+VAT ≠ total` gap — in any analysis, treat the total as authoritative and label the invoice παρακράτηση.
@@ -54,7 +54,7 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 
 *Preconditions (do these before generating anything):*
 1. **Freshness** — recent Hosthub sync (~2 h cadence; ↻ Refresh forces one; server also runs a daily `AUTO_SYNC_HOUR` sync).
-2. **Test suites green** (Imports → Run Tests): P1–P15, Mm1–Mm4, Pc1–Pc13. A red test before close is a stop sign. Known standing failure: **P4 on Votsala 2–8** (pending decision).
+2. **Test suites green** (Imports → Run Tests): P1–P15, Mm1–Mm4, Pc1–Pc13. A red test before close is a stop sign. P4 same-address carriers are **Votsala 1** and **Horizon**; Votsala 2–8 / Panorama / Resilience are exempt.
 3. **Expense allocation complete for the report month** (Runbook D) — sweep for unassigned chargeable expenses; anything unallocated is invisible in every report and silently under-charges owners. Attribution calls are Lefteris's.
 4. **Profile gaps** — unprofiled apartments are flagged in the tab and break TAKK/invoice scoping; profiles get set in Configuration first.
 
@@ -163,8 +163,9 @@ Server build **v6**, verified our side; **blocked on Viva** granting OAuth scope
 
 1. **Art Island** Previous Balance: −602.69 inflates the June payout; correct entry is **+602.69**.
 2. **67 unassigned chargeable expenses** — invisible in all reports; attribution moves real money.
-3. **Votsala 2–8 `businessTax`** — same-address exemption verification with the accountant → relax P4, or enable the flag.
-4. **Joël Ollivier (Art House)** — verify guest-pays-at-property in Hosthub before treating missing fees as a bug.
+3. **Joël Ollivier (Art House)** — verify guest-pays-at-property in Hosthub before treating missing fees as a bug.
+
+Closed 28 Aug 2026: Votsala / Lycabettus business tax — only **Votsala 1** and **Horizon** carry the flag.
 
 ## Pending work & data gaps (as of 31 Jul 2026)
 

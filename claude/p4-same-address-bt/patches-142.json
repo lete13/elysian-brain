@@ -1,0 +1,35 @@
+{
+ "baseSha256": "9c31eff41a1d419efcf446e29bec2389d105fd8902749c97c2d3705c343c330c",
+ "expectedSha256": "df5088325c6ec549934e8180b1437867ef015986ea89d9e34af4e3134b8ceed1",
+ "builtAt": "2026-08-28 P4 same-address business tax: only Votsala 1 and Horizon carry the flag",
+ "patches": [
+  {
+   "note": "P4 same-address groups: only Votsala 1 and Horizon carry businessTax",
+   "find": "  // ── TEST GROUP 5: Leased Profile invariants ───────────────────────────────\n  // Any property with profile='leased' must have these flags set correctly\n  if (typeof S !== 'undefined' && S.apts) {\n    const leasedApts = S.apts.filter(function(a){ return a.profile === 'leased'; });\n    leasedApts.forEach(function(a) {\n      const name = a.name.slice(0,20);\n      assertEq('P1 '+name+' deductCT',         a.deductCT,         true);\n      assertEq('P2 '+name+' deductVAT',         a.deductVAT,        true);\n      assertEq('P3 '+name+' municipalityTax',   a.municipalityTax,  true);\n      assertEq('P4 '+name+' businessTax',       a.businessTax,      true);\n      assertEq('P5 '+name+' vatOnFees=false',   a.vatOnFees,        false);\n    });\n    if (leasedApts.length === 0) {\n      results.push({ name:'P1-P5 Leased profile (no leased properties configured)', pass:true, actual:'skip', expected:'skip' });\n    }",
+   "replace": "  // ── TEST GROUP 5: Leased Profile invariants ───────────────────────────────\n  // Any property with profile='leased' must have these flags set correctly\n  // P4 (businessTax): same-address buildings share one levy. Designated\n  // carriers (must have the flag): Votsala 1, Elysian Lycabettus - Horizon.\n  // Exempt: Votsala 2–8, Panorama, Resilience.\n  function sameAddressBtGroup(a) {\n    const n = String((a && a.name) || '').toLowerCase();\n    if (/votsala/.test(n)) return 'votsala';\n    if ((/\\bhorizon\\b/.test(n) || /\\bpanorama\\b/.test(n) || /res+ilience/.test(n))\n        && /elysian|lycabettus/.test(n)) return 'lycabettus-hpr';\n    return '';\n  }\n  function sameAddressBtCarrier(a) {\n    const n = String((a && a.name) || '').toLowerCase();\n    if (/votsala\\s*1\\b/.test(n)) return 'votsala';\n    if (/\\bhorizon\\b/.test(n) && /elysian|lycabettus/.test(n)\n        && !/panorama|res+ilience/.test(n)) return 'lycabettus-hpr';\n    return '';\n  }\n  function sameAddressBtCovered(a, apts) {\n    const g = sameAddressBtGroup(a);\n    if (!g) return false;\n    return (apts || []).some(function(x){ return sameAddressBtCarrier(x) === g && !!x.businessTax; });\n  }\n  if (typeof S !== 'undefined' && S.apts) {\n    const leasedApts = S.apts.filter(function(a){ return a.profile === 'leased'; });\n    leasedApts.forEach(function(a) {\n      const name = a.name.slice(0,20);\n      assertEq('P1 '+name+' deductCT',         a.deductCT,         true);\n      assertEq('P2 '+name+' deductVAT',         a.deductVAT,        true);\n      assertEq('P3 '+name+' municipalityTax',   a.municipalityTax,  true);\n      if (sameAddressBtCarrier(a)) {\n        assertEq('P4 '+name+' businessTax (designated carrier)', a.businessTax, true);\n      } else if (!sameAddressBtGroup(a)) {\n        assertEq('P4 '+name+' businessTax',     a.businessTax,      true);\n      }\n      assertEq('P5 '+name+' vatOnFees=false',   a.vatOnFees,        false);\n    });\n    const btGroups = [\n      { key:'votsala', label:'Votsala 1' },\n      { key:'lycabettus-hpr', label:'Horizon' }\n    ];\n    btGroups.forEach(function(g){\n      const members = leasedApts.filter(function(a){ return sameAddressBtGroup(a) === g.key; });\n      if (!members.length) return;\n      const carriers = members.filter(sameAddressBtCarrier);\n      assertEq('P4 '+g.label+' designated carrier present', carriers.length > 0, true);\n      assertEq('P4 '+g.label+' carries businessTax', carriers.some(function(a){ return !!a.businessTax; }), true);\n    });\n    if (leasedApts.length === 0) {\n      results.push({ name:'P1-P5 Leased profile (no leased properties configured)', pass:true, actual:'skip', expected:'skip' });\n    }",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "function sameAddressBtCarrier(a)",
+   "note": "designated-carrier helper exists"
+  },
+  {
+   "has": "lycabettus-hpr",
+   "note": "Horizon/Panorama/Resilience share one P4 group"
+  },
+  {
+   "has": "g.label+' carries businessTax",
+   "note": "named carrier assertion"
+  },
+  {
+   "has": "businessTax (designated carrier)",
+   "note": "Votsala 1 and Horizon must have the flag"
+  },
+  {
+   "hasNot": "assertEq('P4 '+name+' businessTax',       a.businessTax,      true);",
+   "note": "old per-apartment P4 is gone"
+  }
+ ]
+}

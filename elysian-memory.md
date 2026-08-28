@@ -1,6 +1,6 @@
 # Elysian — Master Memory Document
 
-**v1.4 · 15 Aug 2026 · maintained by Lefteris + Claude**
+**v1.5 · 28 Aug 2026 · maintained by Lefteris + Claude**
 
 Purpose: the single source of truth about Elysian for any Claude session. Keep this in the Claude project (suggested path `claude/elysian-memory.md`), alongside the feature docs.
 
@@ -62,7 +62,7 @@ Unprofiled apartments are flagged in Monthly Tasks and break checklist scoping (
 ### Taxes & levies
 - **VAT / municipality tax behaviour** — profile-driven via the Configuration flags above; the tool computes it. VAT returns themselves: monthly, by E-New Generation, out of scope.
 - **TAKK** — **Elysian issues it and pays it** for private apartments (the two monthly task lines), due by the **20th**. Presumed = ΤΑΚΚ, Τέλος Ανθεκτικότητας στην Κλιματική Κρίση (climate-crisis resilience fee) — working assumption, unobjected.
-- **Business tax (τέλος επιτηδεύματος)** — a **leased-profile** fixed monthly charge (`businessTax` flag; reduces the mgmt-fee base once per month). Live evidence: all 20 flagged units are leased; the only leased units *without* it are **Votsala 2–8** — exactly what invariant **P4 (leased ⇒ businessTax)** reports. **Exemption rule: units at the same exact registered address may qualify** → the Votsala decision is a verification task for the accountant: same address confirmed → exempt → relax P4; otherwise → enable the flag.
+- **Business tax (τέλος επιτηδεύματος)** — a **leased-profile** fixed monthly charge (`businessTax` flag; reduces the mgmt-fee base once per month). Same-address buildings share **one** levy. **Designated carriers (Lefteris, 28 Aug 2026): Votsala 1 and Elysian Lycabettus – Horizon.** Votsala 2–8, Panorama and Resilience are exempt. Run Tests **P4** requires those two flags and does not require the rest of each building. Other leased units still need their own flag. Payout math is unchanged — a unit is only charged if *its* flag is on.
 - **Παρακράτηση (contractor withholding, ~3%)** — applies to **contractor/technician invoices**. Reframed 27 Jul 2026: the VAT is unchanged; only the *payment* splits in two (part paid by the vendor, part by Elysian) — **the recorded invoice total remains the full chargeable amount**. Desired behaviour: **auto-tag these invoices as παρακράτηση and charge the total** (replaces the old "flag, don't auto-correct" convention → approved app change, pending build, §8).
 
 ### Fixed monthly charges (months-aware, fixed 20 Jul 2026)
@@ -168,7 +168,7 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 - **Change workflow**: Claude edits locally under `/mnt/user-data/outputs/elysian-clearing/`, presents; **Lefteris reviews and pushes** — or, for small server/spec releases, **Claude pushes a side branch via the GitHub connector and opens a PR; Lefteris's merge is the approval** (direct `main` writes stay blocked for the connector). Release mechanics: **frontend** via `fe/patches.json` (sha-gated exact-string patches applied at boot; consolidation = full `index.html` web-upload + reset to `{"patches":[]}` — the base-drift gate makes a missed reset harmless; verify via `/api/fe-info`) · **server** via `srv/patches.json` applied at boot by **`srv-boot.js`** (same sha gates, all-or-nothing; local dry-run: `SRVBOOT_DRYRUN=1 node srv-boot.js` → `server.gen.js`). Shipped this way: email probe (PR #3), Resend transport (PR #4, dormant), Oxygen diagnostics (PR #5).
 - **Permission model (set 27 Jul 2026)**: read-only by default; **on Lefteris's explicit request for a specific action** ("tick Birdhouse", "mark TAKK done for X") Claude executes it in the live app via the browser. Claude never *initiates* money-moving changes — expense attribution, tax flags, sign corrections, overrides are proposed with € impact and await explicit confirmation.
 - **Live-app write protocol** (60 s poll can overwrite saves): **pause poll → fetch fresh snapshot → mutate → save → re-fetch to confirm.**
-- **Test suites** (Imports → Run Tests): invariants **P1–P15** (P4 = leased ⇒ businessTax) · months-aware charges **Mm1–Mm4** · Payments Check **Pc1–Pc13** · email pagination **Em1–Em5** · server `node server.js --viva-selftest` / `--viva-fetch-test`. **Golden locked financials — one per profile (deliberate coverage)**: *Elysian Lycabettus – Horizon* 🏢 · *Cozy Corner Zografou* 🤝 · *Acropolis Skyline Sunset* 🏠.
+- **Test suites** (Imports → Run Tests): invariants **P1–P15** (P4 = leased ⇒ businessTax, with same-address carriers **Votsala 1** and **Horizon** covering their buildings) · months-aware charges **Mm1–Mm4** · Payments Check **Pc1–Pc13** · email pagination **Em1–Em5** · server `node server.js --viva-selftest` / `--viva-fetch-test`. **Golden locked financials — one per profile (deliberate coverage)**: *Elysian Lycabettus – Horizon* 🏢 · *Cozy Corner Zografou* 🤝 · *Acropolis Skyline Sunset* 🏠.
 - **Claude-in-Chrome playbook**: `select_browser` needs the full device UUID; JS returns truncate ~900–1,000 chars → compact strings/slices, stash arrays on `window.__aptRows`; `reduce` over `S.bks` (never spread into `Math.min/max`); re-establish tab context after bridge drops. Unattended scheduled runs **cannot** drive the browser → no live `S` without Lefteris's session. Site permissions are per-domain and remembered — a denied prompt (railway.com, docs.oxygen.gr) blocks that domain until re-allowed from the extension.
 - **Excel outputs** with formulas: run `/mnt/skills/public/xlsx/scripts/recalc.py` after saving.
 
@@ -180,7 +180,9 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 
 **Approved app changes, pending draft & review:** ③ Παρακράτηση handling — auto-tag contractor/technician invoices where `net+VAT ≠ total`, charge the **recorded total** (replaces flag-only). ④ Split the invoices task into two lines: *Elysian invoices → E-New Generation* (leased, 20th) and *B2B partner invoices* (B2B, 25th).
 
-**Decisions pending (Lefteris):** Art Island Previous Balance −602.69 → **+602.69** · **67 unassigned chargeable expenses** · **Votsala 2–8** same-address exemption verification (→ relax P4 or enable flag) · **Joël Ollivier (Art House)** guest-pays-at-property verification in Hosthub.
+**Decisions pending (Lefteris):** Art Island Previous Balance −602.69 → **+602.69** · **67 unassigned chargeable expenses** · **Joël Ollivier (Art House)** guest-pays-at-property verification in Hosthub.
+
+**Closed 28 Aug 2026:** Votsala / Lycabettus business tax — **only Votsala 1 and Horizon carry the flag**; same-address exemption for Votsala 2–8, Panorama and Resilience (Run Tests P4, FE 142). Live leftover: Panorama’s `businessTax` flag is still on until turned off in Configuration.
 
 **Data gaps (from the 27 Jul live pull):** `b2bPartner` empty on **all 16 B2B units** (needed for the 25th flow) · `language` unset on 4 units (A modern & Peaceful · Elysian Agon · The Skarlatos residence · Vista Acropolis).
 
@@ -227,8 +229,8 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 | 17 | Elysian Hightower ᵀ | Thessaloniki | 🏢 leased | EN | BT |
 | 18 | Elysian Ithaki | Athens | 🏠 private | EN | |
 | 19 | Elysian Lycabettus - Horizon ★ | Athens | 🏢 leased | EN | BT |
-| 20 | Elysian Lycabettus - Panorama | Athens | 🏢 leased | EN | BT |
-| 21 | Elysian Lycabettus Resilience | Athens | 🏢 leased | EN | BT |
+| 20 | Elysian Lycabettus - Panorama | Athens | 🏢 leased | EN | *same address as Horizon* |
+| 21 | Elysian Lycabettus Resilience | Athens | 🏢 leased | EN | *same address as Horizon* |
 | 22 | Elysian Smyrni \| Marble Elegance Retreat | Nea Smyrni | 🏠 private | EN | |
 | 23 | Filonexia Apartment Athens | Cholargos | 🏢 leased | EN | BT |
 | 24 | Le Alex, Bright & Modern Escape near CityCenter ᵀ | Neapoli | 🤝 b2b | EN | |
@@ -258,13 +260,13 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 | 48 | Villa Liberty | Isthmia (Corinthia) | 🏠 private | EN | |
 | 49 | Vista Acropolis | Athens | 🏢 leased | — | BT |
 | 50 | Votsala 1 Luxury Stay with Patio | Piraeus | 🏢 leased | EN | BT |
-| 51 | Votsala 2 Luxury Stay with Patio | Piraeus | 🏢 leased | EN | *pending decision* |
-| 52 | Votsala 3 Deluxe & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
-| 53 | Votsala 4 Small & Elegant Apartment in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
-| 54 | Votsala 5 Luxury Studio with Balcony in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
-| 55 | Votsala 6 Deluxe & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
-| 56 | Votsala 7 Small & Elegant Apartment in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
-| 57 | Votsala 8 Elegant & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *pending decision* |
+| 51 | Votsala 2 Luxury Stay with Patio | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
+| 52 | Votsala 3 Deluxe & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
+| 53 | Votsala 4 Small & Elegant Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
+| 54 | Votsala 5 Luxury Studio with Balcony in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
+| 55 | Votsala 6 Deluxe & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
+| 56 | Votsala 7 Small & Elegant Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
+| 57 | Votsala 8 Elegant & Modern Apartment in Piraeus | Piraeus | 🏢 leased | EN | *same address as Votsala 1* |
 
 Owner names/emails and per-unit rates live in `S.apts` / Configuration — read live when needed (fine to use; only the ΑΦΜ is excluded from docs).
 
@@ -284,7 +286,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked) · `claude/p4-same-address-bt.md` (28 Aug 2026 — P4 carriers Votsala 1 and Horizon)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
@@ -311,6 +313,7 @@ Owner names/emails and per-unit rates live in `S.apts` / Configuration — read 
 ---
 
 ## Changelog
+- **v1.5 (28 Aug 2026)** — Business tax same-address rule: **only Votsala 1 and Horizon carry the flag**; Votsala 2–8, Panorama and Resilience are exempt. Run Tests P4 (FE 142 / SRV 109). Doc: `claude/p4-same-address-bt.md`.
 - **v1.4 (15 Aug 2026)** — Platform Invoices Airbnb pull **live** (new-tab `www.airbnb.gr` capture; archive by **VAT issue date**, not Hosthub `created`/`cancelledAt`; Hosthub codes; Excel ship). Two-code test saved real AIUC PDFs (job `ppmsuw193wm05or`). Booking.com parked. `USERS_JSON` confirmed on Railway. Platform Invoices is a primary Accounting/Admin tab. Daily Ops Beta UI and Personnel remain as of 8 Aug. Doc: `claude/platform-invoices-feature.md`. Source: live Collect 15 Aug 2026; Lefteris dating rule; clearing `main` `db13617` / `5eff0da`.
 - **13 Aug 2026** — Platform invoices: **Airbnb = Hosthub `reservationId` → confirmation-code pull** (VAT Invoicer-style); Booking.com pull parked for now. Doc: `claude/platform-invoices-feature.md`.
 - **13 Aug 2026** — Platform invoices: **pull-first automation** (DB portal sessions, multi-property Booking pull, upload emergency-only). Doc: `claude/platform-invoices-feature.md`.
