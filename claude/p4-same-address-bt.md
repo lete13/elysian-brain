@@ -21,4 +21,4 @@ Apply on top of FE 141 / SRV 108 (Hosthub tax recovery). Copy:
 - `fe/patches-142.json`
 - `srv/patches-109.json`
 
-Live config note (28 Aug): Panorama still has `businessTax` on in production. Reports will keep deducting ~€50/month there until that flag is turned off. Run Tests will already pass with Horizon + Votsala 1 as carriers even if Panorama’s flag stays on.
+Live 28 Aug: Votsala 1 and Horizon have `businessTax` on; Votsala 2–8, Panorama and Resilience do not. Payout still follows each unit’s own flag.

@@ -182,7 +182,7 @@ Checklist mechanics: month-by-month, defaults to previous month; **proof-require
 
 **Decisions pending (Lefteris):** Art Island Previous Balance −602.69 → **+602.69** · **67 unassigned chargeable expenses** · **Joël Ollivier (Art House)** guest-pays-at-property verification in Hosthub.
 
-**Closed 28 Aug 2026:** Votsala / Lycabettus business tax — **only Votsala 1 and Horizon carry the flag**; same-address exemption for Votsala 2–8, Panorama and Resilience (Run Tests P4, FE 142). Live leftover: Panorama’s `businessTax` flag is still on until turned off in Configuration.
+**Closed 28 Aug 2026:** Votsala / Lycabettus business tax — **only Votsala 1 and Horizon carry the flag**; same-address exemption for Votsala 2–8, Panorama and Resilience (Run Tests P4, FE 142).
 
 **Data gaps (from the 27 Jul live pull):** `b2bPartner` empty on **all 16 B2B units** (needed for the 25th flow) · `language` unset on 4 units (A modern & Peaceful · Elysian Agon · The Skarlatos residence · Vista Acropolis).
 
