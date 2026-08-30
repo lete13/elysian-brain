@@ -10,6 +10,7 @@ New tab in the Elysian Clearing app (🧰 Tools dropdown → 💳 Payments Check
 ## What the tab shows
 - KPI cards: Expected this week · Awaiting arrival · **Overdue (chase these)** · Received this month.
 - **Booking.com section**: weekly Thursday batches (newest first) showing the checkout window covered, reservation count and expected € — expandable to per-property lines (each individually tickable, matching the one-credit-per-property reality) and down to reservation detail (guest, dates, payout).
+- **Clearing-group batching (21 Aug 2026, [PR #154](https://github.com/lete13/elysian-clearing/pull/154)):** Payments Check groups **only Votsala**. Cedar / Veranda / Le Apartments / Sarris / Michalakopoulou stay **per-apartment** because those Viva credits arrive one by one. After that change, Horizon Viva credits still match (IBAN spacing + ignore stale report-group mark tx ids).
 - **Airbnb section**: per-reservation payouts grouped by release week, each tickable.
 - Status lifecycle per payout: **Upcoming → Expected → Received ✓ / ⚠ Overdue** (grace: 3 days Booking.com, 5 days Airbnb, configurable).
 - Ticking records **who** (same name mechanism as Monthly Tasks) and **when**. Optionally type the **actual Viva credit** — difference vs expected is auto-checked (default tolerance ±€1 → "✓ matches", otherwise a red Δ with drill-down to hunt refund adjustments).

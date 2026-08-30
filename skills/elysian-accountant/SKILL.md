@@ -14,7 +14,7 @@ You are the accounting copilot for **Elysian** (an ΙΚΕ; the ΑΦΜ is never w
 
 All accounting flows through the custom **Elysian Clearing** app: `lete13/elysian-clearing` (public repo) → Railway auto-deploy (~60 s) → `elysian-clearing-production.up.railway.app`. `index.html` (~628 KB) + `server.js` (Node/Express + PostgreSQL), password-gated (`APP_PASSWORD` / `/api/session`), shared state polled every 60 s.
 
-If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read it first — it is the umbrella source of truth and may be newer than this skill. Also relevant: `claude/apartment-config.md` (live Configuration snapshot for every apartment), `claude/monthly-tasks-feature.md`, `claude/payments-check-feature.md`, `claude/platform-invoices-feature.md`.
+If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read it first — it is the umbrella source of truth and may be newer than this skill. Also relevant: `claude/apartment-config.md` + `claude/apartment-catalog.json` (every apartment field we have without a live login), `claude/monthly-tasks-feature.md`, `claude/payments-check-feature.md`, `claude/platform-invoices-feature.md`.
 
 ## Non-negotiable ground rules
 
@@ -53,7 +53,7 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 ### Wave 1 — by the 10th: clearing reports out, all apartments
 
 *Preconditions (do these before generating anything):*
-1. **Freshness** — recent Hosthub sync (~2 h cadence; ↻ Refresh forces one; server also runs a daily `AUTO_SYNC_HOUR` sync).
+1. **Freshness** — recent Hosthub sync (**15-minute** auto-sync; ↻ Refresh forces one; server also runs a daily `AUTO_SYNC_HOUR` job). Auto-sync must not replace bookings with a partial fetch (clearing #164). After a tax wipe, use **Pull full database (incl. taxes)** — `claude/hosthub-tax-backfill.md`.
 2. **Test suites green** (Imports → Run Tests): P1–P15, Mm1–Mm4, Pc1–Pc13. A red test before close is a stop sign. P4 same-address carriers are **Votsala 1** and **Horizon**; Votsala 2–8 / Panorama / Resilience are exempt.
 3. **Expense allocation complete for the report month** (Runbook D) — sweep for unassigned chargeable expenses; anything unallocated is invisible in every report and silently under-charges owners. Attribution calls are Lefteris's.
 4. **Profile gaps** — unprofiled apartments are flagged in the tab and break TAKK/invoice scoping; profiles get set in Configuration first.
@@ -68,7 +68,7 @@ Built-in task lines in the Monthly Tasks tab, scoped live by profile: **Monthly 
 
 1. **TAKK Issuance** (private apartments) — issue the ειδικό στοιχείο per stay; upload proof per apartment line.
 2. **TAKK Payment** (private apartments) — pay what was issued; proof per line. (Statutory δήλωση deadline is month-end — internal 20th is the buffer; filer confirmation pending.)
-3. **Platform invoices, leased / Elysian-tax units** — pull **ASAP** after portal documents exist. **Dating = the VAT issue date printed on the PDF/HTML**, not Hosthub `created` / `cancelledAt` (those only decide which stay to open). One stay can yield several docs (normal ×1, cancel ×2, 1 extend ×3, n extends × `(1+2n)`); file each under **its own** issue month. In the app: Platform Invoices (Accounting/Admin tab) → month → Expect → Collect → **Pull Airbnb (Hosthub codes)**. **Test pull** = `HM9DCDMEXT` and `HMWRNAWHBA` (not “latest 5”). A **0 PDF** result is a failure. Booking.com pull is parked. Ship = PDFs + `Airbnb-VAT-YYYY-MM.xls` (Πρόσημο `-` on credits) to `info@e-newgeneration.gr` + `info@elysianproperties.eu`. See `claude/platform-invoices-feature.md`.
+3. **Platform invoices, leased / Elysian-tax units** — pull **ASAP** after portal documents exist. **Dating = the VAT issue date printed on the PDF/HTML**, not Hosthub `created` / `cancelledAt` (those only decide which stay to open). One stay can yield several docs (normal ×1, cancel ×2, 1 extend ×3, n extends × `(1+2n)`); file each under **its own** issue month. In the app: Platform Invoices (Accounting/Admin tab) → month → Expect → Collect → **Pull Airbnb (Hosthub codes)** and **Booking.com Finance zip**. **Test pull** = `HM9DCDMEXT` and `HMWRNAWHBA` (not “latest 5”). A **0 PDF** result is a failure. Votsala share Booking hotel id `13180441`. Ship = PDFs + `Platform-invoices-YYYY-MM.csv` (Πρόσημο `-` on credits; packs chunk 1/N) to `info@e-newgeneration.gr` + `info@elysianproperties.eu`. See `claude/platform-invoices-feature.md`.
 
 ### Wave 3 — B2B / external groups (platform invoices)
 
@@ -83,7 +83,7 @@ Drive the "left to do" counter to zero, escalating as the 10th/20th/25th near wi
 
 ## Runbook B — Payments reconciliation (Viva account)
 
-**Booking.com**: `payout(Thursday T) = Σ checkouts ∈ [T−7, T−1]` — each checkout pays on the first Thursday strictly after it. **One credit per property per Thursday.** Expected = gross − commission − payment charges (Hosthub "Total Payout") − `trChan`. Validated against Birdhouse's real statement, Thu 23 Jul 2026.
+**Booking.com**: `payout(Thursday T) = Σ checkouts ∈ [T−7, T−1]` — each checkout pays on the first Thursday strictly after it. **One credit per property per Thursday.** Expected = gross − commission − payment charges (Hosthub "Total Payout") − `trChan`. Validated against Birdhouse's real statement, Thu 23 Jul 2026. Payments Check **batches only Votsala**; other `clearGroup`s stay per-apartment (credits arrive one by one). Horizon Viva credits still match after that change.
 
 **Airbnb**: released ~24 h after **check-in**, one credit **per reservation**, bank in ~1–3 business days. Expected = gross − host service fee (never a payment charge).
 
@@ -153,7 +153,7 @@ Mechanics: `select_browser` requires the **full device UUID**; JS returns trunca
 - **Files**: copy/edit under `/mnt/user-data/outputs/elysian-clearing/`, present; Lefteris pushes.
 - **After logic changes**, run the matching suite: fixed charges → Mm1–Mm4; payments → Pc1–Pc13; profiles → P1–P15; Viva matching → `node server.js --viva-selftest`; connectivity → `--viva-fetch-test`. **Golden locked financials — deliberately one per profile**: *Elysian Lycabettus – Horizon* 🏢, *Cozy Corner Zografou* 🤝, *Acropolis Skyline Sunset* 🏠 — must not move.
 - **Excel deliverables** with formulas: run `/mnt/skills/public/xlsx/scripts/recalc.py` after saving.
-- **Hosthub property removal** — blast radius: revenue snapshots survive; bookings wholesale-replaced within ~2 h (anti-wipe will NOT catch one property vanishing); config never sync-deleted; in-app delete orphans revenue data.
+- **Hosthub property removal** — blast radius: revenue snapshots survive; bookings wholesale-replaced on the next successful full-enough sync (anti-wipe will NOT catch one property vanishing); config never sync-deleted; in-app delete orphans revenue data.
 
 ## Viva bank bridge — current status
 

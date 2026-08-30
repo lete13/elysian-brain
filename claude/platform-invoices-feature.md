@@ -1,6 +1,6 @@
 # Platform invoices (Airbnb / Booking.com)
 
-State as of **15 Aug 2026**. Aligns the app with the internal **Invoices Accounting Process** SOP (no individual names in this doc).
+State as of **23 Aug 2026** (Airbnb pull live 15 Aug; Booking.com zip + agent + CSV ship through [#169](https://github.com/lete13/elysian-clearing/pull/169)). Aligns the app with the internal **Invoices Accounting Process** SOP (no individual names in this doc).
 
 ## What these are (and are not)
 
@@ -28,7 +28,7 @@ Start the pull **as soon as the month’s portal documents are available**. Do n
 - Summarises reservations and cuts **one invoice per apartment** the **month after** the stays.
 - Example: all **June** bookings for apartment X → **one** July invoice for apartment X (not one PDF per booking).
 - Hosthub expect for document month **M** lists **unique apartments** with Booking.com bookings **created in M−1** (active). Booking count is shown only as context.
-- Pull remains **parked** while Airbnb Hosthub-code pull is the focus. Manual fallback: admin.booking.com → Finance → Invoices.
+- **Collect is live via Finance zip + Connect**, not a calendar scrape. One PDF per apartment (Votsala 1–8 share hotel id `13180441` and the same invoice is shown on every Votsala card). Manual fallback: admin.booking.com → Finance → Invoices.
 
 ### Airbnb — two different date jobs
 
@@ -94,14 +94,17 @@ No manual pasting of codes. Re-sync Hosthub if Expect shows “missing code”.
 
 Both are Airbnb Ireland UC reverse-charge invoices to Elysian. Vault `total` on those two rows was stored as **0** (parser matched VAT rate `0.0%`); parser on `main` now takes **Subtotal €**. Folder `Requests` is the stay-page heading when Hosthub apt name was not posted with the test pull.
 
-### Booking.com (parked for now)
+### Booking.com (zip + Connect — 16–23 Aug 2026)
 
-Booking.com pull (admin.booking.com, one invoice per apartment, month-after dating) remains in the worker but is **not** the Collect focus. Manual fallback if needed:
+No longer “parked as the only path”. Collect now:
 
-1. admin.booking.com → Finance → Invoices
-2. Select month → download outstanding documents
-3. File under apartment / month / Booking
-4. Remember: invoice month = month after the bookings month
+1. **Connect** Booking.com in-app (headed Chrome; IP-block cooldown persisted in Postgres — do not retry after a server-IP block).
+2. **Map hotel ids** from the Connect session onto `S.apts[].bookingHotelId` (FE 131; Villa Liberty `3575720` in FE 132). Votsala units share `13180441`.
+3. **Upload a Finance → Invoices zip** (`POST /api/platform-invoices/booking-zip`). CID PDFs decode to the apartment. Booking invoices are **not** treated as reservation statements ([#160](https://github.com/lete13/elysian-clearing/pull/160)).
+4. Reconcile by **departure month**. Shared Votsala invoice appears on Votsala 1–8 ([#161](https://github.com/lete13/elysian-clearing/pull/161)).
+5. **Agent** (`POST /api/platform-invoices/agent`) runs leftover Airbnb pull + Booking reconcile against accountant cards ([#158](https://github.com/lete13/elysian-clearing/pull/158)).
+
+Headless Chrome is refused for Booking.com Connect. Emergency PDF upload remains under Collect → Emergency.
 
 ---
 
@@ -114,7 +117,7 @@ Booking.com pull (admin.booking.com, one invoice per apartment, month-after dati
 
 When Elysian’s own packs for month X are filed, send one completion notification (subject like `PLATFORM INVOICES MONTH/YEAR`).
 
-Ship email attaches the PDFs **plus** `Airbnb-VAT-YYYY-MM.xls`: Ημερομηνία = issue date, Αιτιολογία = invoice number (`AIUC-…`), Ποσό = total €, Πρόσημο ποσού = empty if positive / `-` if credit. Extra columns: reservation id, listing name, check-in, check-out.
+Ship email attaches the PDFs **plus** `Platform-invoices-YYYY-MM.csv` (UTF-8 BOM, 23 Aug — was `.xls`). Columns: Α/Α, Ημερομηνία, Αιτιολογία, Ποσό, Πρόσημο ποσού (`-` on credits), plus reservation / listing / dates. Vault **Booking.com** rows are included. Oversized packs split into part **1/N** emails ([#166](https://github.com/lete13/elysian-clearing/pull/166)). **Ship anyway** forces the per-card plan on a manual send ([#167](https://github.com/lete13/elysian-clearing/pull/167)).
 
 ---
 
@@ -124,9 +127,10 @@ Primary nav tab for Accounting and Admin (sidebar icon as of 15 Aug 2026). Guide
 
 1. **Start** — pick document month
 2. **Expect** — which Hosthub stays to open **and** estimated invoice count (not “PDF count = stay count”)
-3. **Collect** — **Test pull** (the two codes above) · **Pull Airbnb (Hosthub codes)** · **Stop pull** · Connect Airbnb if the session expired · upload is emergency-only
-4. **Review** — vault by apartment; **Open** serves the PDF
-5. **Ship** — email finished Elysian pack + Excel to accountants
+3. **Collect** — **Test pull** (the two codes above) · **Pull Airbnb (Hosthub codes)** · **Stop pull** · Connect Airbnb / Booking.com · **Booking.com Finance zip** · upload is emergency-only
+4. **Accountants** sub-menu — per-card apartments, leftover-pull agent, departure-month Booking reconcile
+5. **Review** — vault by apartment / platform / year / month (folders start closed); **Open** serves the PDF
+6. **Ship** — email finished pack + CSV to accountants (chunked if large; Ship anyway override)
 
 A **0 PDF** pull is a failure with portal error text — **Connect** Airbnb and confirm Hosthub codes, then Pull again (do not treat monthly PDF upload as the process).
 
