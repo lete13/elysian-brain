@@ -1,0 +1,15 @@
+{
+  "name": "Elysian Clearing",
+  "user": "ubuntu",
+  "repositoryDependencies": ["github.com/lete13/elysian-clearing"],
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "app",
+      "command": "bash .cursor/run-app.sh",
+      "description": "Elysian Clearing server (Express + PostgreSQL) on http://localhost:3000. Log in with APP_PASSWORD (default: elysian2025)."
+    }
+  ],
+  "ports": [{ "name": "web", "port": 3000 }]
+}
