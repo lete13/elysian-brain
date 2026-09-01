@@ -1,0 +1,93 @@
+{
+ "baseSha256": "36aa40fa2e9ad591b9ecd0ca95ccce77a8b72a75ee469cea9599db90e04b599f",
+ "expectedSha256": "c40ac2881f3f8b7e02021af2e3d69ff9d0fd58451324a946b13f6e6e11726f7f",
+ "builtAt": "2026-09-01 Block Monthly Close when Oxygen contact is missing (invoice not issued)",
+ "patches": [
+  {
+   "note": "Email send: abort when a private/B2B apartment has no Oxygen contact (invoice would not issue)",
+   "find": "        if (!_apt.oxyContactId) {\n          _oxyNote = 'Link a Fiscal contact (Oxygen) in Config to issue the ' + _label + '.';\n        } else if (_prev && _prev.invoiceId) {",
+   "replace": "        var _missOxy = [];\n        function _needOxy(apt) {\n          if (!apt) return;\n          var pr = apt.profile;\n          if (pr !== 'private' && pr !== 'b2b') return;\n          if (String(apt.oxyContactId || '').trim()) return;\n          var nm = apt.name || String(apt.id);\n          if (_missOxy.indexOf(nm) < 0) _missOxy.push(nm);\n        }\n        _needOxy(_apt);\n        ((st.d && st.d.packets) || []).forEach(function (pk) { _needOxy(pk && pk.a); });\n        if (_missOxy.length) {\n          _oxyNote = 'Link a Fiscal contact (Oxygen) in Configuration for ' + _missOxy.join(', ') + '. The invoice is not issued, so the email was not sent.';\n          _abortSend = true;\n        } else if (_prev && _prev.invoiceId) {",
+   "count": 1
+  },
+  {
+   "note": "Email send: show the specific abort reason (missing contact or cancelled issue)",
+   "find": "    if (_abortSend) {\n      if (status) status.textContent = 'Send cancelled - the invoice was not issued, so the email was not sent either. Click Send email when ready.';",
+   "replace": "    if (_abortSend) {\n      if (status) status.textContent = _oxyNote || 'Send cancelled - the invoice was not issued, so the email was not sent either. Click Send email when ready.';",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close: helper — which apartments in this unit lack an Oxygen contact",
+   "find": "  function takkProofs(stage, aptId) {\n    var st = (S.monthlyTasks && S.monthlyTasks[mcMonth]) || {};\n    var e = st[stage + '|' + aptId];\n    return (e && e.proofs) ? e.proofs.length : 0;\n  }\n  function isDone(a, key) {",
+   "replace": "  function takkProofs(stage, aptId) {\n    var st = (S.monthlyTasks && S.monthlyTasks[mcMonth]) || {};\n    var e = st[stage + '|' + aptId];\n    return (e && e.proofs) ? e.proofs.length : 0;\n  }\n  function mcOxyMissing(a) {\n    var ids = (a && a.members && a.members.length) ? a.members : [a && a.id];\n    var names = [];\n    (ids || []).forEach(function (id) {\n      if (id == null || id === '') return;\n      var apt = null;\n      (S.apts || []).forEach(function (x) { if (x && String(x.id) === String(id)) apt = x; });\n      if (!apt) return;\n      var p = apt.profile || a.type;\n      if (p === 'leased') return;\n      if (p !== 'private' && p !== 'b2b') return;\n      if (String(apt.oxyContactId || '').trim()) return;\n      names.push(apt.name || String(id));\n    });\n    return names.length ? names.join(', ') : '';\n  }\n  function mcOxyBlockMsg(a) {\n    var miss = mcOxyMissing(a);\n    if (miss) return 'Link a Fiscal contact (Oxygen) in Configuration for ' + miss + '. The invoice is not issued — cannot continue.';\n    return 'The invoice has not been issued yet. Send the owner email to issue it. Cannot continue.';\n  }\n  window.mcOpenCfg = function () {\n    if (typeof showTab === 'function') showTab('cfg');\n    toast('Link the Fiscal contact (Oxygen) on the apartment in Configuration, then return to Monthly Close.', 'warn');\n  };\n  window.mcOxyNeedIssue = function () {\n    toast('The invoice has not been issued yet. Send the owner email — that issues the ΑΠΥ/ΤΠΥ. Cannot continue without it.', 'err');\n  };\n  function isDone(a, key) {",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close: ticking Receipt/Invoice done does not satisfy the stage — only a real Oxygen stamp does",
+   "find": "    if (r && r.done && r.done[key]) return true;",
+   "replace": "    if (r && r.done && r.done[key] && key !== 'receipt' && key !== 'invoice') return true;",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close: pill click cannot skip an unissued invoice",
+   "find": "    var r1 = mcRec(id, true); if (r1.undone) delete r1.undone[key];\n    // Email is not a checkbox - it is the action that sends and issues the document.",
+   "replace": "    var r1 = mcRec(id, true); if (r1.undone) delete r1.undone[key];\n    if ((key === 'receipt' || key === 'invoice') && !isDone(a, key)) {\n      toast(mcOxyBlockMsg(a), 'err');\n      save(); renderMt(); return;\n    }\n    // Email is not a checkbox - it is the action that sends and issues the document.",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close: Mark done / Finish cannot complete Receipt/Invoice without an issued document",
+   "find": "    if (PROOF_STAGE[key]) {\n      save();\n      if (typeof mtSetMonth === 'function') mtSetMonth(mcMonth);\n      if (typeof mtToggle === 'function') { mtToggle(enc(key + '|' + id)); return; }\n    }\n    r.done[key] = { by: who(), at: Date.now() };\n    save(); renderMt();\n  }\n  window.mcSetDone = mcSetDone;",
+   "replace": "    if (PROOF_STAGE[key]) {\n      save();\n      if (typeof mtSetMonth === 'function') mtSetMonth(mcMonth);\n      if (typeof mtToggle === 'function') { mtToggle(enc(key + '|' + id)); return; }\n    }\n    if (key === 'receipt' || key === 'invoice') {\n      toast(mcOxyBlockMsg(a), 'err');\n      save(); renderMt(); return;\n    }\n    r.done[key] = { by: who(), at: Date.now() };\n    save(); renderMt();\n  }\n  window.mcSetDone = mcSetDone;",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close: batch-clear cannot fake an Oxygen invoice",
+   "find": "    var manual = list.filter(function (a) { return !!PROOF_STAGE[batchStage]; });\n    if (manual.length) { toast('TAKK lines need a proof each - open them individually.', 'warn'); return; }",
+   "replace": "    if (batchStage === 'receipt' || batchStage === 'invoice') {\n      toast('Receipt/Invoice closes only when Oxygen issues the document. Link the Fiscal contact in Configuration if it is missing.', 'err');\n      return;\n    }\n    var manual = list.filter(function (a) { return !!PROOF_STAGE[batchStage]; });\n    if (manual.length) { toast('TAKK lines need a proof each - open them individually.', 'warn'); return; }",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close focus card: know whether the current unit is missing an Oxygen contact",
+   "find": "        var f = flowOf(cur), i = nextIdx(cur), s = f[i], r = mcRec(cur.id);",
+   "replace": "        var f = flowOf(cur), i = nextIdx(cur), s = f[i], r = mcRec(cur.id), oxyMiss = mcOxyMissing(cur);",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close focus card: explain why the invoice cannot be issued",
+   "find": "            : (AUTO_STAGE[s.key] ? '<span class=\"mc-auto\">detected automatically once done in the app</span>' : ''))",
+   "replace": "            : (AUTO_STAGE[s.key] ? '<span class=\"mc-auto\">detected automatically once done in the app</span>' : ''))\n          + ((s.key === 'email' || s.key === 'receipt' || s.key === 'invoice') && oxyMiss\n            ? '<span class=\"mc-auto\" style=\"color:#b45309;display:block;margin-top:8px\">No linked Oxygen contact for ' + esc(oxyMiss) + '. The invoice will not be issued — link it in Configuration before continuing.</span>'\n            : (s.key === 'receipt' || s.key === 'invoice'\n              ? '<span class=\"mc-auto\" style=\"color:#b45309;display:block;margin-top:8px\">Invoice not issued. Send the owner email to issue the ΑΠΥ/ΤΠΥ — cannot finish without it.</span>'\n              : ''))",
+   "count": 1
+  },
+  {
+   "note": "Monthly Close focus card: replace Finish/Mark done when the invoice cannot be issued",
+   "find": "          + '<button class=\"btn sm primary\" onclick=\"mcAdvance(\\'' + esc(cur.id) + '\\')\">' + (i === f.length - 1 ? 'Finish' : 'Mark done') + ' &rarr;</button>'",
+   "replace": "          + ((s.key === 'receipt' || s.key === 'invoice')\n            ? '<button class=\"btn sm primary\" onclick=\"' + (oxyMiss ? 'mcOpenCfg()' : 'mcOxyNeedIssue()') + '\">' + (oxyMiss ? 'Link Oxygen contact' : 'Invoice not issued') + '</button>'\n            : (oxyMiss && s.key === 'email'\n              ? '<button class=\"btn sm primary\" onclick=\"mcOpenCfg()\">Link Oxygen contact</button>'\n              : '<button class=\"btn sm primary\" onclick=\"mcAdvance(\\'' + esc(cur.id) + '\\')\">' + (i === f.length - 1 ? 'Finish' : 'Mark done') + ' &rarr;</button>'))",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "function mcOxyMissing(a)",
+   "note": "missing-contact helper"
+  },
+  {
+   "has": "The invoice is not issued, so the email was not sent.",
+   "note": "email send aborts without a contact"
+  },
+  {
+   "has": "key !== 'receipt' && key !== 'invoice'",
+   "note": "manual tick does not complete invoice"
+  },
+  {
+   "has": "Link Oxygen contact",
+   "note": "focus card primary action when blocked"
+  },
+  {
+   "has": "mcOpenCfg",
+   "note": "jumps to Configuration to link the contact"
+  },
+  {
+   "hasNot": "Link a Fiscal contact (Oxygen) in Config to issue the ' + _label + '.';",
+   "note": "old warn-and-continue contact note removed"
+  }
+ ]
+}

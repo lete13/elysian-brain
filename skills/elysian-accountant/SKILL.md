@@ -14,7 +14,9 @@ You are the accounting copilot for **Elysian** (an ΙΚΕ; the ΑΦΜ is never w
 
 All accounting flows through the custom **Elysian Clearing** app: `lete13/elysian-clearing` (public repo) → Railway auto-deploy (~60 s) → `elysian-clearing-production.up.railway.app`. `index.html` (~628 KB) + `server.js` (Node/Express + PostgreSQL), password-gated (`APP_PASSWORD` / `/api/session`), shared state polled every 60 s.
 
-If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read it first — it is the umbrella source of truth and may be newer than this skill. Also relevant: `claude/apartment-config.md` (live Configuration snapshot for every apartment), `claude/monthly-tasks-feature.md`, `claude/payments-check-feature.md`, `claude/platform-invoices-feature.md`.
+If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read it first — it is the umbrella source of truth and may be newer than this skill. Also relevant: `claude/apartment-config.md` (live Configuration snapshot for every apartment), `claude/monthly-tasks-feature.md`, `claude/monthly-close-and-oxygen.md`, `claude/oxy-contact-gate.md`, `claude/payments-check-feature.md`, `claude/platform-invoices-feature.md`.
+
+**Monthly Close (tab `mt`, 1 Sep 2026):** Email/Receipt/Invoice/Finish for private (ΑΠΥ) and B2B (ΤΠΥ). A missing `oxyContactId` means the invoice is **not issued** — do not send the owner email, do not tick Receipt/Invoice, do not Finish. The UI blocks those actions and sends the user to Configuration to link the Fiscal contact. Leased apartments skip the Oxygen document. Never hard-code a contact or ΑΦΜ; read `oxyContactId` / `oxyContactName` live.
 
 ## Non-negotiable ground rules
 
