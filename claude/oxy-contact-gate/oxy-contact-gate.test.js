@@ -49,7 +49,7 @@ function extractFn(source, name) {
 }
 
 const fe = applyKind('fe');
-assert.strictEqual(fe.last, 'patches-143.json', 'FE 143 is the tip');
+assert.strictEqual(fe.last, 'patches-144.json', 'FE 144 is the tip');
 assert(fe.src.includes('function mcOxyMissing(a)'), 'helper present');
 assert(fe.src.includes('The invoice is not issued, so the email was not sent.'), 'send aborts');
 assert(fe.src.includes("key !== 'receipt' && key !== 'invoice'"), 'manual tick ignored for invoice');
@@ -60,6 +60,10 @@ assert(
   'old warn-and-continue note gone'
 );
 assert(fe.src.includes("if (batchStage === 'receipt' || batchStage === 'invoice')"), 'batch clear blocked');
+assert(
+  fe.src.includes("if (key === 'email') {\n      if (mcOxyMissing(a)) { toast(mcOxyBlockMsg(a), 'err'); save(); renderMt(); return; }"),
+  'email pill blocked without contact'
+);
 
 const ctx = {
   S: {
