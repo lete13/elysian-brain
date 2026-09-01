@@ -1,0 +1,25 @@
+{
+ "baseSha256": "c40ac2881f3f8b7e02021af2e3d69ff9d0fd58451324a946b13f6e6e11726f7f",
+ "expectedSha256": "de8e43479df24f8d6c7a66dc052f3ad0c9dd17e6242f0e5d6a875f70ffd4fdba",
+ "builtAt": "2026-09-01 Email/Mark done also blocked when Oxygen contact is missing",
+ "patches": [
+  {
+   "note": "Email pill: do not open Send email when the Oxygen contact is missing",
+   "find": "    // Email is not a checkbox - it is the action that sends and issues the document.\n    if (key === 'email') { save(); mcOpenReport(id, true); return; }",
+   "replace": "    // Email is not a checkbox - it is the action that sends and issues the document.\n    if (key === 'email') {\n      if (mcOxyMissing(a)) { toast(mcOxyBlockMsg(a), 'err'); save(); renderMt(); return; }\n      save(); mcOpenReport(id, true); return;\n    }",
+   "count": 1
+  },
+  {
+   "note": "Mark done / list Send email: do not open the report when the Oxygen contact is missing",
+   "find": "    if (key === 'email') { save(); mcOpenReport(id, true); return; }\n    // Report cannot be ticked from here - it has to be confirmed on the report itself.",
+   "replace": "    if (key === 'email') {\n      if (mcOxyMissing(a)) { toast(mcOxyBlockMsg(a), 'err'); save(); renderMt(); return; }\n      save(); mcOpenReport(id, true); return;\n    }\n    // Report cannot be ticked from here - it has to be confirmed on the report itself.",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "if (key === 'email') {\n      if (mcOxyMissing(a)) { toast(mcOxyBlockMsg(a), 'err'); save(); renderMt(); return; }",
+   "note": "email continue blocked without contact"
+  }
+ ]
+}

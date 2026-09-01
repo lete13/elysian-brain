@@ -17,6 +17,7 @@ Private knowledge base — the canonical home of Elysian's memory document, feat
   - `p4-same-address-bt.md` — Run Tests P4: only Votsala 1 and Horizon carry business tax
   - `platform-invoices-feature.md` — Airbnb/Booking.com host-portal invoices → accountants (≠ Oxygen)
   - `monthly-close-and-oxygen.md` — Monthly Close + Oxygen owner documents
+  - `oxy-contact-gate.md` — Monthly Close cannot continue without a linked Oxygen contact (FE 143+144)
   - `hosthub-tax-backfill.md` — SRV 108 / FE 141: failed-run flag + full Hosthub pull including Greek taxes (TAKK) after the 22 Aug wipe
   - `stale-save-guard.md` — stop a stale browser tab overwriting Configuration (14 Aug class)
 - `skills/` — sources for the Claude skills (`elysian-accountant`, `elysian-executive-assistant`)

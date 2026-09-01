@@ -1,6 +1,6 @@
 # Elysian Clearing — Oxygen invoicing + Monthly Close
 
-State as of 7 August 2026. Repo: `lete13/elysian-clearing`, deployed on Railway at
+State as of 1 September 2026 (Oxygen-contact gate). Repo: `lete13/elysian-clearing`, deployed on Railway at
 `https://elysian-clearing-production.up.railway.app/`.
 
 ## How code ships
@@ -70,9 +70,15 @@ cannot be bulk-cleared.
 - **Email** is the last action: it issues the ΑΠΥ/ΤΠΥ at that moment, attaches the invoice PDF
   plus the ΤΑΚΚ and payment proofs alongside the report, sends, then writes cleaning and
   management fees to Elysian Revenue and the payout to Owner Remittance (shown per property in
-  the Annual Tracker). Nothing blocks the send; missing pieces produce a warning naming them.
+  the Annual Tracker). A private or B2B apartment with no linked Oxygen contact (`oxyContactId`)
+  **cannot continue**: Send email aborts (the invoice is not issued, so the email is not sent).
+  The Email pill / Mark done do not open compose. Other missing pieces still warn. Link the Fiscal contact in Configuration and retry.
+  Doc: `claude/oxy-contact-gate.md` (FE 143+144, 1 Sep 2026).
 - **Receipt/Invoice** follows Email and is confirmation only — it staying open means the email
-  went out but the document did not issue.
+  went out but the document did not issue. A stored tick is not enough: the stage completes only
+  when `lock.oxygen.invoiceId` is present. The UI will not let you tick Receipt/Invoice or
+  Finish when the invoice was never issued (including when there is no linked Oxygen contact).
+  Leased apartments skip this stage.
 
 ## Traps worth remembering
 
