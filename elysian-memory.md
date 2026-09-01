@@ -1,6 +1,6 @@
 # Elysian — Master Memory Document
 
-**v1.8 · 1 Sep 2026 · maintained by Lefteris + Claude**
+**v1.9 · 1 Sep 2026 · maintained by Lefteris + Claude**
 
 Purpose: the single source of truth about Elysian for any Claude session. Keep this in the Claude project (suggested path `claude/elysian-memory.md`), alongside the feature docs.
 
@@ -165,6 +165,8 @@ Airbnb pull = **Hosthub reservation codes** (`reservationId` / channel `reservat
 
 **Fiscal contact click (1 Sep 2026, FE 145):** Configuration search → click a name now writes `oxyContactId` / `oxyContactName` and refreshes the card. A focused search box used to swallow the rebuild, so the click looked like a no-op. Doc: `claude/oxy-fiscal-pick.md`.
 
+**Not needed counts as sent (1 Sep 2026, FE 146):** an apartment marked **Not needed this month** is complete for that month — it increments **sent**, moves the progress bar, and appears under the Sent filter. The gray **not needed** chip is a breakdown only. Private TAKK is still due. Doc: `claude/mc-skip-counts-complete.md`.
+
 Checklist mechanics: month-by-month, defaults to previous month; **proof-required completion** (file ≤15 MB; upload auto-completes; deleting last proof reverts; N/A needs a reason); records who (👤 per-browser name — expect Popi and others) and when; manager (Lefteris) opens proofs via 📎; completed lines pool in the green bottom list with the "left to do" counter; custom recurring tasks supported.
 
 ---
@@ -241,7 +243,7 @@ Read rates, tax flags, fixed charges, and owners from the snapshot or live `S.ap
 
 ## 11. Related documents
 
-- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026; updated 1 Sep 2026) · `claude/oxy-contact-gate.md` (1 Sep 2026 — Monthly Close cannot continue without a linked Oxygen contact) · `claude/oxy-fiscal-pick.md` (1 Sep 2026 — Configuration click-to-link Fiscal contact) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked) · `claude/p4-same-address-bt.md` (28 Aug 2026 — P4 carriers Votsala 1 and Horizon) · `claude/apartment-config.md` + `claude/apartment-config.json` (28 Aug 2026 — live Configuration snapshot for every apartment)
+- `claude/monthly-tasks-feature.md` (20 Jul 2026) · `claude/payments-check-feature.md` (24 Jul 2026) · `claude/email-report-feature.md` (4–5 Aug 2026) · `claude/oxygen-integration-spec.md` (5 Aug 2026) · `claude/monthly-close-and-oxygen.md` (7 Aug 2026; updated 1 Sep 2026) · `claude/oxy-contact-gate.md` (1 Sep 2026 — Monthly Close cannot continue without a linked Oxygen contact) · `claude/oxy-fiscal-pick.md` (1 Sep 2026 — Configuration click-to-link Fiscal contact) · `claude/mc-skip-counts-complete.md` (1 Sep 2026 — Not needed this month counts as sent) · `claude/platform-invoices-feature.md` (15 Aug 2026 — Airbnb pull live; file by VAT issue date; Booking parked) · `claude/p4-same-address-bt.md` (28 Aug 2026 — P4 carriers Votsala 1 and Horizon) · `claude/apartment-config.md` + `claude/apartment-config.json` (28 Aug 2026 — live Configuration snapshot for every apartment)
 - Skills: **elysian-accountant** (+ `references/viva-api-notes.md`) · **elysian-executive-assistant**
 - Brain repo: **`lete13/elysian-brain`** (private) — canonical home of this document, the feature docs, and the skill sources; Claude writes via pull requests
 
@@ -268,6 +270,7 @@ Read rates, tax flags, fixed charges, and owners from the snapshot or live `S.ap
 ---
 
 ## Changelog
+- **v1.9 (1 Sep 2026)** — Monthly Close: **Not needed this month** counts as sent/complete in the month meter (progress, sent count, Sent filter). FE **146**. Doc: `claude/mc-skip-counts-complete.md`. Source: Lefteris, 1 Sep 2026.
 - **v1.8 (1 Sep 2026)** — Configuration Fiscal contact (Oxygen): clicking a search hit now links `oxyContactId` / `oxyContactName`. The focused search box had been blocking the Configuration rebuild. FE **145**. Doc: `claude/oxy-fiscal-pick.md`. Source: Lefteris, 1 Sep 2026.
 - **v1.7 (1 Sep 2026)** — Monthly Close cannot continue when a private or B2B apartment has no linked Oxygen contact (`oxyContactId`): Send email aborts (invoice not issued), Email/Mark done does not open compose, Receipt/Invoice cannot be ticked, Finish is blocked. Leased units unchanged. Clearing FE **143** + **144**. Doc: `claude/oxy-contact-gate.md`. Source: Lefteris, 1 Sep 2026.
 - **v1.6 (28 Aug 2026)** — Live Configuration snapshot for **all apartments** in [`claude/apartment-config.md`](claude/apartment-config.md) / [`claude/apartment-config.json`](claude/apartment-config.json). Operating portfolio **61** (31 leased / 16 B2B / 14 private) plus dummy ZZ-TEST-DONOTUSE. New units: Ariadne, Mary, Amarysia, Pallantides; Filonexia → Filoxenia. §9 directory table retired in favour of the snapshot (anti-bloat). ΑΦΜ never stored. Source: production `/api/db/data` 28 Aug 2026.

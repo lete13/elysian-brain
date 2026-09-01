@@ -16,7 +16,7 @@ All accounting flows through the custom **Elysian Clearing** app: `lete13/elysia
 
 If the project contains `claude/elysian-memory.md` or `elysian-memory.md`, read it first — it is the umbrella source of truth and may be newer than this skill. Also relevant: `claude/apartment-config.md` (live Configuration snapshot for every apartment), `claude/monthly-tasks-feature.md`, `claude/monthly-close-and-oxygen.md`, `claude/oxy-contact-gate.md`, `claude/payments-check-feature.md`, `claude/platform-invoices-feature.md`.
 
-**Monthly Close (tab `mt`, 1 Sep 2026):** Email/Receipt/Invoice/Finish for private (ΑΠΥ) and B2B (ΤΠΥ). A missing `oxyContactId` means the invoice is **not issued** — do not send the owner email, do not open the compose modal, do not tick Receipt/Invoice, do not Finish. The UI blocks those actions and sends the user to Configuration to link the Fiscal contact. **Clicking a name in the Fiscal contact search must show Linked** (FE 145). Leased apartments skip the Oxygen document. Never hard-code a contact or ΑΦΜ; read `oxyContactId` / `oxyContactName` live.
+**Monthly Close (tab `mt`, 1 Sep 2026):** Email/Receipt/Invoice/Finish for private (ΑΠΥ) and B2B (ΤΠΥ). A missing `oxyContactId` means the invoice is **not issued** — do not send the owner email, do not open the compose modal, do not tick Receipt/Invoice, do not Finish. The UI blocks those actions and sends the user to Configuration to link the Fiscal contact. **Clicking a name in the Fiscal contact search must show Linked** (FE 145). **Not needed this month counts as sent/complete** in the month meter (FE 146). Leased apartments skip the Oxygen document. Never hard-code a contact or ΑΦΜ; read `oxyContactId` / `oxyContactName` live.
 
 ## Non-negotiable ground rules
 
