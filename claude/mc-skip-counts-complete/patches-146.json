@@ -1,0 +1,59 @@
+{
+ "baseSha256": "4815987383aa9450eb1b28362e4e51b1960f601d2daa2e3795bc4c9f6ecccb1b",
+ "expectedSha256": "74f76991b5a93a65b73b1ea6108466a34f5a83d84ba49ca10d8dd9ea39073fb5",
+ "builtAt": "2026-09-01 Monthly Close: Not needed this month counts as sent",
+ "patches": [
+  {
+   "note": "complete() is true for apartments marked Not needed this month",
+   "find": "var complete = function (a) { return nextIdx(a) === flowOf(a).length; };",
+   "replace": "var complete = function (a) { return (typeof mcSkipped === 'function' && mcSkipped(a.id)) || nextIdx(a) === flowOf(a).length; };",
+   "count": 1
+  },
+  {
+   "note": "Not-needed apartments increment the sent/complete count",
+   "find": "      if (mcSkipped(a.id)) { skipN += n; return; }   // not needed this month\n      if (complete(a)) done += n; else if (started(a)) doing += n;",
+   "replace": "      if (mcSkipped(a.id)) skipN += n;   // still shown as not needed\n      if (complete(a)) done += n; else if (started(a)) doing += n;",
+   "count": 1
+  },
+  {
+   "note": "Progress denominator is every apartment; skipped count as sent",
+   "find": "    var _need = Math.max(0, tot - skipN);   // apartments that actually need clearing\n    var pct = _need ? Math.round(done / _need * 100) : 100;",
+   "replace": "    var _need = tot;   // skipped apartments count as sent/complete\n    var pct = _need ? Math.round(done / _need * 100) : 0;",
+   "count": 1
+  },
+  {
+   "note": "Not-started legend does not subtract skipped twice (they are already in done)",
+   "find": "' + (tot - done - doing - skipN) + ' not started</span>'",
+   "replace": "' + (tot - done - doing) + ' not started</span>'",
+   "count": 1
+  },
+  {
+   "note": "List Not-started filter excludes Not-needed (they are complete)",
+   "find": "        if (statusFilter === 'todo' && started(a)) return false;",
+   "replace": "        if (statusFilter === 'todo' && (started(a) || complete(a))) return false;",
+   "count": 1
+  }
+ ],
+ "assertions": [
+  {
+   "has": "(typeof mcSkipped === 'function' && mcSkipped(a.id)) || nextIdx(a)",
+   "note": "complete includes skipped"
+  },
+  {
+   "has": "if (mcSkipped(a.id)) skipN += n;   // still shown as not needed",
+   "note": "skipped still tallied for the chip"
+  },
+  {
+   "has": "var _need = tot;   // skipped apartments count as sent/complete",
+   "note": "progress uses the full month"
+  },
+  {
+   "has": "' + (tot - done - doing) + ' not started</span>'",
+   "note": "not-started is not double-subtracted"
+  },
+  {
+   "has": "statusFilter === 'todo' && (started(a) || complete(a))",
+   "note": "Sent/Not-started list matches the count"
+  }
+ ]
+}

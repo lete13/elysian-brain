@@ -60,6 +60,8 @@ send timestamp — so they close as the work is done. Proof-backed stages (ΤΑ�
 pay, remittance Payment) require an uploaded file, list attachments with a remove button, and
 cannot be bulk-cleared.
 
+- **Not needed this month** (password-gated, for a new or dormant unit with nothing to clear) **counts as sent/complete** in the month meter: it increments **sent**, moves the progress bar, and appears under Sent. The gray **not needed** chip is a breakdown. Private TAKK is still due. FE **146**, 1 Sep 2026. Doc: `claude/mc-skip-counts-complete.md`.
+
 - **Report** must be explicitly confirmed on the real Reports tab ("Report checked →"). That
   confirmation freezes payout, B2B remittance and the tax split, plus the period used and who
   confirmed it. An apartment cannot reach Payment without it, so the amount paid is always the
